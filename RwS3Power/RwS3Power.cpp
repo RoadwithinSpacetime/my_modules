@@ -28,7 +28,7 @@ public:
 		{
 			// TODO: Signal processing goes here.
 
-			*output = Pow(*input1) * *input2;
+			*output = pow(*input1) * *input2;
 
 
 			// Increment buffer pointers.
