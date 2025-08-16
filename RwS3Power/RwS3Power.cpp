@@ -1,3 +1,4 @@
+#include <math.h>
 #include "mp_sdk_audio.h"
 
 using namespace gmpi;
@@ -27,7 +28,7 @@ public:
 		{
 			// TODO: Signal processing goes here.
 
-			*output = *input1 * *input1 * *input1 * *input2;
+			*output = Pow(*input1) * *input2;
 
 
 			// Increment buffer pointers.
