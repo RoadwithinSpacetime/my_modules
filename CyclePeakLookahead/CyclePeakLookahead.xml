@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<pluginList>
+  <plugin id="CyclePeakLookahead" name="Cycle Peak Lookahead" category="Analyser" help="Per-cycle look-ahead peak detector (=30 ms lookahead).">
+    <inpin id="In" datatype="audio" name="In"/>
+    <outpin id="Out" datatype="audio" name="Out"/>
+    <outpin id="Peak" datatype="float" name="Peak" rate="control"/>
+    <inpin id="LookaheadMs" datatype="float" name="Lookahead (ms)" default="10"/>
+    <inpin id="Hysteresis" datatype="float" name="Zero X Hysteresis" default="0.001"/>
+    <inpin id="AbsMode" datatype="int" name="Use Abs Peak (0/1)" default="1"/>
+  </plugin>
+</pluginList>
