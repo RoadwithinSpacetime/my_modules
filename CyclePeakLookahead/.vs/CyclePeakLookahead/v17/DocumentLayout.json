@@ -1,12 +1,37 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|solutionrelative:CyclePeakLookahead.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": []
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "CyclePeakLookahead.cpp",
+              "DocumentMoniker": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.cpp",
+              "RelativeDocumentMoniker": "CyclePeakLookahead.cpp",
+              "ToolTip": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.cpp",
+              "RelativeToolTip": "CyclePeakLookahead.cpp",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-08-23T09:59:52.707Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }
