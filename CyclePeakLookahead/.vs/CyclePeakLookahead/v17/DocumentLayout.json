@@ -5,6 +5,10 @@
     {
       "AbsoluteMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|solutionrelative:CyclePeakLookahead.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|solutionrelative:CyclePeakLookahead.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     }
   ],
   "DocumentGroupContainers": [
@@ -14,8 +18,21 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "CyclePeakLookahead.h",
+              "DocumentMoniker": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.h",
+              "RelativeDocumentMoniker": "CyclePeakLookahead.h",
+              "ToolTip": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.h",
+              "RelativeToolTip": "CyclePeakLookahead.h",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAYAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-08-23T20:54:01.463Z",
+              "EditorCaption": ""
+            },
             {
               "$type": "Document",
               "DocumentIndex": 0,
@@ -24,9 +41,9 @@
               "RelativeDocumentMoniker": "CyclePeakLookahead.cpp",
               "ToolTip": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.cpp",
               "RelativeToolTip": "CyclePeakLookahead.cpp",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAACEAAAAAAAAAAAAAAB4AAAAxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2025-08-23T09:59:52.707Z",
+              "WhenOpened": "2025-08-23T20:51:32.686Z",
               "EditorCaption": ""
             }
           ]

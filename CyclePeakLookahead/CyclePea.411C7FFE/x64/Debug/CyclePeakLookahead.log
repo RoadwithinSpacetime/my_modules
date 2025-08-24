@@ -1,0 +1,21 @@
+﻿  mp_sdk_audio.cpp
+  mp_sdk_common.cpp
+  Generating Code...
+  CyclePeakLookahead.cpp
+D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\CyclePeakLookahead.h(12,10): error C3668: 'CyclePeakLookahead::subProcess': method with override specifier 'override' did not override any base class methods
+  (compiling source file 'CyclePeakLookahead.cpp')
+  
+D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\CyclePeakLookahead.cpp(37,24): error C2589: '(': illegal token on right side of '::'
+D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\CyclePeakLookahead.cpp(37,24): error C2059: syntax error: ')'
+D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\CyclePeakLookahead.cpp(56,24): error C2660: 'MpAudioPinBase::getBuffer': function does not take 1 arguments
+      C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.h(353,16):
+      see declaration of 'MpAudioPinBase::getBuffer'
+      D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\CyclePeakLookahead.cpp(56,24):
+      while trying to match the argument list '(int)'
+  
+D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\CyclePeakLookahead.cpp(57,26): error C2660: 'MpAudioPinBase::getBuffer': function does not take 1 arguments
+      C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.h(353,16):
+      see declaration of 'MpAudioPinBase::getBuffer'
+      D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\CyclePeakLookahead.cpp(57,26):
+      while trying to match the argument list '(int)'
+  

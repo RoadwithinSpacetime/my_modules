@@ -1,11 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
-<pluginList>
-  <plugin id="CyclePeakLookahead" name="Cycle Peak Lookahead" category="Analyser" help="Per-cycle look-ahead peak detector (=30 ms lookahead).">
-    <inpin id="In" datatype="audio" name="In"/>
-    <outpin id="Out" datatype="audio" name="Out"/>
-    <outpin id="Peak" datatype="float" name="Peak" rate="control"/>
-    <inpin id="LookaheadMs" datatype="float" name="Lookahead (ms)" default="10"/>
-    <inpin id="Hysteresis" datatype="float" name="Zero X Hysteresis" default="0.001"/>
-    <inpin id="AbsMode" datatype="int" name="Use Abs Peak (0/1)" default="1"/>
-  </plugin>
-</pluginList>
+<?xml version="1.0" encoding="UTF-8"?>
+<Module>
+	<Name>CyclePeakLookahead</Name>
+	<Vendor>YourNameOrCompany</Vendor>
+	<Description>
+		Audio module that delays the signal up to 30 ms and provides a lookahead
+		peak detection output with optional absolute mode and hysteresis.
+	</Description>
+
+	<Pin name="Input" datatype="float" direction="in" rate="audio" />
+	<Pin name="Output" datatype="float" direction="out" rate="audio" />
+	<Pin name="Peak" datatype="float" direction="out" rate="control" />
+	<Pin name="Lookahead (ms)" datatype="float" direction="in" default="5" />
+	<Pin name="Hysteresis" datatype="float" direction="in" default="0.001" />
+	<Pin name="Absolute Mode" datatype="int" direction="in" default="0" />
+</Module>

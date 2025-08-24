@@ -1,108 +1,91 @@
-#include "mp_sdk_audio.h"
 #include "CyclePeakLookahead.h"
+#include <algorithm>  // std::max
+#include <cmath>      // std::fabs, std::ceil
 
 REGISTER_PLUGIN(CyclePeakLookahead, L"CyclePeakLookahead");
 
 CyclePeakLookahead::CyclePeakLookahead(IMpUnknown* host)
     : MpBase(host)
-    , pinIn_(this, 0)
-    , pinOut_(this, 1)
-    , pinPeak_(this, 2)
-    , pinLookaheadMs_(this, 3)
-    , pinHysteresis_(this, 4)
-    , pinAbsMode_(this, 5)
 {
-    pinPeak_ = 0.0f;
+    initializePin(pinIn_);
+    initializePin(pinOut_);
+    initializePin(pinPeak_);
+    initializePin(pinLookaheadMs_);
+    initializePin(pinHysteresis_);
+    initializePin(pinAbsMode_);
 }
 
-void CyclePeakLookahead::open()
+int32_t CyclePeakLookahead::open()
 {
-    sampleRate_ = getSampleRate(); // DAW-provided sample rate
-    maxLookaheadSamples_ = static_cast<int>(ceil(0.030 * sampleRate_));
+    // Get sample rate from DAW
+    sampleRate_ = getSampleRate();
+    maxLookaheadSamples_ = static_cast<int>(std::ceil(0.03f * sampleRate_));
+
     delay_.assign(maxLookaheadSamples_ + 256, 0.0f);
     delayWrite_ = 0;
+    lookaheadSamples_ = 0;
+
     updateLookahead();
-    delayRead_ = (delayWrite_ + delay_.size() - (size_t)lookaheadSamples_) % delay_.size();
+    delayRead_ = (delayWrite_ + delay_.size() - lookaheadSamples_) % delay_.size();
+
     SET_PROCESS(&CyclePeakLookahead::subProcess);
-}
-
-void CyclePeakLookahead::updateLookahead()
-{
-    float ms = pinLookaheadMs_;
-    if (ms < 0.f) ms = 0.f;
-    if (ms > 30.f) ms = 30.f;
-
-    lookaheadSamples_ = static_cast<int>(round(ms * 0.001 * sampleRate_));
-    hysteresis_ = std::max(0.0f, pinHysteresis_.getValue());
-    absMode_ = (pinAbsMode_.getValue() != 0);
-
-    if (!delay_.empty())
-    {
-        delayRead_ = (delayWrite_ + delay_.size() - (size_t)lookaheadSamples_) % delay_.size();
-    }
-}
-
-bool CyclePeakLookahead::zeroCrossingNegToPos(float prev, float now, float hysteresis) const
-{
-    return (prev <= -hysteresis && now >= hysteresis);
+    return MpBase::open();
 }
 
 void CyclePeakLookahead::onSetPins()
 {
-    if (pinLookaheadMs_.isUpdated() || pinHysteresis_.isUpdated() || pinAbsMode_.isUpdated())
-    {
-        updateLookahead();
-    }
-    SET_PROCESS(&CyclePeakLookahead::subProcess);
+    // Make sure types match
+    hysteresis_ = std::max(0.0f, static_cast<float>(pinHysteresis_.getValue()));
+    absMode_ = (pinAbsMode_.getValue() != 0);
+
+    updateLookahead();
+}
+
+void CyclePeakLookahead::updateLookahead()
+{
+    sampleRate_ = getSampleRate();
+
+    lookaheadSamples_ = static_cast<int>(pinLookaheadMs_.getValue() * 0.001f * sampleRate_);
+    if (lookaheadSamples_ > maxLookaheadSamples_)
+        lookaheadSamples_ = maxLookaheadSamples_;
+    if (lookaheadSamples_ < 0)
+        lookaheadSamples_ = 0;
 }
 
 void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
 {
-    float* __restrict in = bufferOffset + pinIn_.getBuffer();
-    float* __restrict out = bufferOffset + pinOut_.getBuffer();
+    float* in = pinIn_.getBuffer(bufferOffset);
+    float* out = pinOut_.getBuffer(bufferOffset);
 
-    float last = haveLast_ ? lastSample_ : (sampleFrames > 0 ? in[0] : 0.0f);
-
-    for (int i = 0; i < sampleFrames; ++i)
+    for (int s = 0; s < sampleFrames; ++s)
     {
-        const float x = in[i];
-        const float ax = absMode_ ? fabs(x) : x;
+        float x = in[s];
+        if (absMode_)
+            x = std::fabs(x);
 
-        if (!haveLast_)
-        {
-            haveLast_ = true;
-            currentCycleStartPos_ = inputSamplePos_;
-            currentCycleMax_ = ax;
-        }
-        else
-        {
-            if (ax > currentCycleMax_) currentCycleMax_ = ax;
-        }
-
-        if (zeroCrossingNegToPos(last, x, hysteresis_))
-        {
-            cycles_.push_back({ currentCycleStartPos_, currentCycleMax_ });
-            currentCycleStartPos_ = inputSamplePos_;
-            currentCycleMax_ = ax;
-        }
-
-        ++inputSamplePos_;
-        last = x;
-
+        // Write input to delay line
         delay_[delayWrite_] = x;
         delayWrite_ = (delayWrite_ + 1) % delay_.size();
+
+        // Read delayed output
         float y = delay_[delayRead_];
         delayRead_ = (delayRead_ + 1) % delay_.size();
 
-        while (!cycles_.empty() && (cycles_.front().startPos + lookaheadSamples_) <= outputSamplePos_)
+        // Peak tracking with hysteresis
+        if (x > currentPeak_)
         {
-            pinPeak_ = cycles_.front().peak;
-            cycles_.pop_front();
+            currentPeak_ = x;
+        }
+        else
+        {
+            currentPeak_ -= hysteresis_;
+            if (currentPeak_ < 0.0f)
+                currentPeak_ = 0.0f;
         }
 
-        out[i] = y;
-        ++outputSamplePos_;
+        out[s] = y;
     }
 
-    lastSample_ = last;
+    // Report peak
+    pinPeak_ = currentPeak_;
 }

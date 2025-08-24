@@ -47,7 +47,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\se_sdk3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>SE_TARGET_SEM;WIN32;_DEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -65,6 +65,7 @@
       </ModuleDefinitionFile>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Message>Post-Build Event - Copy to your SEM folder.</Message>
@@ -75,7 +76,7 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>..\se_sdk3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>SE_TARGET_SEM;_SECURE_SCL=0;WIN32;NDEBUG;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
@@ -96,6 +97,7 @@
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <DataExecutionPrevention>
       </DataExecutionPrevention>
+      <AdditionalLibraryDirectories>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Message>Post-Build Event - Copy to your SEM folder.</Message>
@@ -106,14 +108,17 @@
     <None Include="CyclePeakLookahead.xml" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\se_sdk3\mp_sdk_common.cpp" />
-    <ClCompile Include="..\se_sdk3\mp_sdk_audio.cpp" />
-    <ClCompile Include="CyclePeakLookahead.cpp" />
+    <ClCompile Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.cpp" />
+    <ClCompile Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.cpp" />
+    <ClCompile Include="CyclePeakLookahead.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.h" />
+    <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="..\se_sdk3\mp_sdk_common.h" />
-    <ClInclude Include="..\se_sdk3\mp_sdk_audio.h" />
     <ClInclude Include="CyclePeakLookahead.h" />
   </ItemGroup>
   <ItemGroup>
