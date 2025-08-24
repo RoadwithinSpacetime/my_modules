@@ -8,14 +8,13 @@ class CyclePeakLookahead : public MpBase
 public:
     CyclePeakLookahead(IMpUnknown* host);
 
-    int32_t open() override;
-    void subProcess(int bufferOffset, int sampleFrames) override;
+    void open() override;                 // SDK3 uses void, not int32_t
+    void subProcess(int bufferOffset, int sampleFrames); // no override
     void onSetPins() override;
 
 private:
     void updateLookahead();
 
-    // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
     FloatOutPin pinPeak_;
@@ -23,15 +22,14 @@ private:
     FloatInPin  pinHysteresis_;
     IntInPin    pinAbsMode_;
 
-    // State
-    float sampleRate_{ 44100.0f };
-    int maxLookaheadSamples_{ 0 };
-    int lookaheadSamples_{ 0 };
-    float hysteresis_{ 0.0f };
-    bool absMode_{ false };
+    float sampleRate_ = 44100.0f;
+    int lookaheadSamples_ = 0;
+    int maxLookaheadSamples_ = 0;
+    float hysteresis_ = 0.0f;
+    bool absMode_ = false;
 
     std::vector<float> delay_;
-    size_t delayWrite_{ 0 };
-    size_t delayRead_{ 0 };
-    float currentPeak_{ 0.0f };
+    size_t delayWrite_ = 0;
+    size_t delayRead_ = 0;
+    float currentPeak_ = 0.0f;
 };
