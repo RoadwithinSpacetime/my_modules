@@ -19,6 +19,7 @@
     <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.h">
       <Filter>sdk</Filter>
     </ClInclude>
+    <ClInclude Include="CyclePeakLookahead.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="CyclePeakLookahead.xml" />

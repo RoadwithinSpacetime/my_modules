@@ -113,6 +113,7 @@
   <ItemGroup>
     <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.h" />
     <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.h" />
+    <ClInclude Include="CyclePeakLookahead.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
