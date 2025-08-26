@@ -1,77 +1,62 @@
-#include "CyclePeakLookahead.h"
-#include <algorithm>  // std::max
-#include <cmath>      // std::fabs, std::ceil
+#include "mp_sdk_audio.h"
+#include "mp_sdk_common.h"
+#include <iostream>
 
-REGISTER_PLUGIN(CyclePeakLookahead, L"CyclePeakLookahead");
+using namespace gmpi;
 
-CyclePeakLookahead::CyclePeakLookahead(IMpUnknown* host)
-    : MpBase(host)
+class CyclePeakLookahead final : public MpBase2
 {
-    initializePin(pinIn_);
-    initializePin(pinOut_);
-    initializePin(pinPeak_);
-    initializePin(pinLookaheadMs_);
-    initializePin(pinHysteresis_);
-    initializePin(pinAbsMode_);
-}
+	AudioInPin pinInput1;
+	AudioInPin pinInput2;
+	AudioOutPin pinOutput;
 
-void CyclePeakLookahead::open()
+public:
+	CyclePeakLookahead()
+	{
+		initializePin( pinInput1 );
+		initializePin( pinInput2 );
+		initializePin( pinOutput );
+	}
+
+	void subProcess( int sampleFrames )
+	{
+		// get pointers to in/output buffers.
+		auto input1 = getBuffer(pinInput1);
+		auto input2 = getBuffer(pinInput2);
+		auto output = getBuffer(pinOutput);
+
+		for( int s = sampleFrames; s > 0; --s )
+		{
+			// TODO: Signal processing goes here.
+
+			*output = *input1 * *input2 * 10;
+
+			// Increment buffer pointers.
+			++input1;
+			++input2;
+			++output;
+		}
+	}
+
+	void onSetPins() override
+	{
+		// Check which pins are updated.
+		if( pinInput1.isStreaming() )
+		{
+		}
+		if( pinInput2.isStreaming() )
+		{
+		}
+
+		// Set state of output audio pins.
+		pinOutput.setStreaming(true);
+
+		// Set processing method.
+		setSubProcess(&CyclePeakLookahead::subProcess);
+	}
+};
+
+namespace
 {
-    // Initialize sample rate from DAW
-    sampleRate_ = getSampleRate();
-    maxLookaheadSamples_ = static_cast<int>(std::ceil(0.03f * sampleRate_));
-
-    delay_.assign(maxLookaheadSamples_ + 256, 0.0f);
-    delayWrite_ = 0;
-    lookaheadSamples_ = 0;
-    updateLookahead();
-    delayRead_ = (delayWrite_ + delay_.size() - lookaheadSamples_) % delay_.size();
-
-    SET_PROCESS(&CyclePeakLookahead::subProcess);
-}
-
-void CyclePeakLookahead::onSetPins()
-{
-    hysteresis_ = std::max(0.0f, static_cast<float>(pinHysteresis_.getValue()));
-    absMode_ = pinAbsMode_.getValue() != 0;
-
-    updateLookahead();
-}
-
-void CyclePeakLookahead::updateLookahead()
-{
-    sampleRate_ = getSampleRate();
-
-    lookaheadSamples_ = static_cast<int>(pinLookaheadMs_.getValue() * 0.001f * sampleRate_);
-    if (lookaheadSamples_ > maxLookaheadSamples_) lookaheadSamples_ = maxLookaheadSamples_;
-    if (lookaheadSamples_ < 0) lookaheadSamples_ = 0;
-}
-
-void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
-{
-    float* in = pinIn_.getBuffer(bufferOffset);
-    float* out = pinOut_.getBuffer(bufferOffset);
-
-    for (int s = 0; s < sampleFrames; ++s)
-    {
-        float x = in[s];
-        if (absMode_) x = std::fabs(x);
-
-        delay_[delayWrite_] = x;
-        delayWrite_ = (delayWrite_ + 1) % delay_.size();
-
-        float y = delay_[delayRead_];
-        delayRead_ = (delayRead_ + 1) % delay_.size();
-
-        if (x > currentPeak_) currentPeak_ = x;
-        else
-        {
-            currentPeak_ -= hysteresis_;
-            if (currentPeak_ < 0.0f) currentPeak_ = 0.0f;
-        }
-
-        out[s] = y;
-    }
-
-    pinPeak_ = currentPeak_;
+	auto r = Register<CyclePeakLookahead>::withId(L"My CyclePeakLookahead");
 }

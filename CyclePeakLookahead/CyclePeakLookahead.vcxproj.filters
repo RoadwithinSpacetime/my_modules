@@ -1,29 +1,27 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="CyclePeakLookahead.cpp">
+    <ClCompile Include="CyclePeakLookahead.cpp" />
+    <ClCompile Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.cpp">
       <Filter>sdk</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.cpp">
-      <Filter>Resources</Filter>
-    </ClCompile>
     <ClCompile Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.cpp">
-      <Filter>Resources</Filter>
+      <Filter>sdk</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
       <Filter>Resources</Filter>
     </ClInclude>
-    <ClInclude Include="CyclePeakLookahead.h">
+    <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.h">
       <Filter>sdk</Filter>
     </ClInclude>
-    <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.h">
-      <Filter>Resources</Filter>
-    </ClInclude>
     <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.h">
-      <Filter>Resources</Filter>
+      <Filter>sdk</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="CyclePeakLookahead.xml" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="sdk">
@@ -35,12 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CyclePeakLookahead.rc">
-      <Filter>sdk</Filter>
+      <Filter>Resources</Filter>
     </ResourceCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="CyclePeakLookahead.xml">
-      <Filter>sdk</Filter>
-    </None>
   </ItemGroup>
 </Project>
