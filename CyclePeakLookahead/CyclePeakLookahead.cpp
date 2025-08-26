@@ -1,6 +1,4 @@
 #include "CyclePeakLookahead.h"
-#include <algorithm>
-#include <cmath>
 
 REGISTER_PLUGIN(CyclePeakLookahead, L"CyclePeakLookahead");
 
@@ -23,11 +21,10 @@ int32_t CyclePeakLookahead::open()
 
     delay_.assign(maxLookaheadSamples_ + 256, 0.0f);
     delayWrite_ = 0;
-    lookaheadSamples_ = 0;
     updateLookahead();
     delayRead_ = (delayWrite_ + delay_.size() - lookaheadSamples_) % delay_.size();
 
-    SET_PROCESS(&CyclePeakLookahead::subProcess);
+    SET_PROCESS(&CyclePeakLookahead::subProcess);  
     return MpBase::open();
 }
 
@@ -49,10 +46,12 @@ void CyclePeakLookahead::updateLookahead()
         lookaheadSamples_ = 0;
 }
 
-void CyclePeakLookahead::subProcess(int sampleFrames)
+void CyclePeakLookahead::subProcess(int bufferOffset)
 {
-    float* in = pinIn_.getBuffer();
-    float* out = pinOut_.getBuffer();
+    int sampleFrames = getBlockSize();   
+
+    float* in = pinIn_.getBuffer(bufferOffset);
+    float* out = pinOut_.getBuffer(bufferOffset);
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -67,9 +66,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         delayRead_ = (delayRead_ + 1) % delay_.size();
 
         if (x > currentPeak_)
-        {
             currentPeak_ = x;
-        }
         else
         {
             currentPeak_ -= hysteresis_;
