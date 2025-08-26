@@ -2,8 +2,8 @@
 #include "mp_sdk_common.h"
 #include <iostream>
 #include "CyclePeakLookahead.h"
-#include <algorithm> // std::max
-#include <cmath>     // std::fabs, std::ceil
+#include <algorithm> 
+#include <cmath>     
 
 REGISTER_PLUGIN(CyclePeakLookahead, L"CyclePeakLookahead");
 
