@@ -45,12 +45,12 @@
     <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.sem</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</IncludePath>
-    <LibraryPath>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</IncludePath>
-    <LibraryPath>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
