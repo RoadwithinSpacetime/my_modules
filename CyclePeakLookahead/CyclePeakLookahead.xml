@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Module>
-  <Name>CyclePeakLookahead</Name>
-  <Vendor>Road_within_Spacetime</Vendor>
-  <Description>
-    Audio module that delays the signal up to 30 ms and provides a lookahead
-    peak detection output with optional absolute mode and hysteresis.
-  </Description>
-
-  <Pin name="Input" datatype="float" direction="in" rate="audio" />
-  <Pin name="Output" datatype="float" direction="out" rate="audio" />
-  <Pin name="Peak" datatype="float" direction="out" rate="control" />
-  <Pin name="Lookahead (ms)" datatype="float" direction="in" default="5" />
-  <Pin name="Hysteresis" datatype="float" direction="in" default="0.001" />
-  <Pin name="Absolute Mode" datatype="int" direction="in" default="0" />
-</Module>
+<PluginList>
+    <Plugin id="CyclePeakLookahead" name="CyclePeakLookahead" category="Modifiers">
+        <Audio>
+            <Pin name="Input" datatype="float" direction="in" rate="audio"/>
+            <Pin name="Output" datatype="float" direction="out" rate="audio"/>
+        </Audio>
+        <Parameters>
+            <Pin name="Peak" datatype="float" direction="out" rate="control"/>
+            <Pin name="Lookahead (ms)" datatype="float" direction="in" default="5"/>
+            <Pin name="Hysteresis" datatype="float" direction="in" default="0.001"/>
+            <Pin name="Absolute Mode" datatype="int" direction="in" default="0"/>
+        </Parameters>
+        <Vendor>Road_within_Spacetime</Vendor>
+        <Description>
+            Audio module that delays the signal up to 30 ms and provides a lookahead peak detection output with optional absolute mode and hysteresis.
+        </Description>
+    </Plugin>
+</PluginList>
