@@ -51,4 +51,9 @@
   <ItemGroup>
     <Text Include="CyclePeakLookahead.def.TXT" />
   </ItemGroup>
+  <ItemGroup>
+    <Xml Include="CyclePeakLookahead.xml">
+      <Filter>XML Files</Filter>
+    </Xml>
+  </ItemGroup>
 </Project>
