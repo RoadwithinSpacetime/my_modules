@@ -1,0 +1,3 @@
+LIBRARY "CyclePeakLookahead"
+EXPORTS
+    seModule_init

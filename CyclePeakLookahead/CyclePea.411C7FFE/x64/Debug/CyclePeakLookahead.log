@@ -1,0 +1,6 @@
+﻿  mp_sdk_audio.cpp
+  mp_sdk_common.cpp
+  CyclePeakLookahead.cpp
+  Generating Code...
+     Creating library D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\x64\Debug\CyclePeakLookahead.lib and object D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\x64\Debug\CyclePeakLookahead.exp
+  CyclePeakLookahead.vcxproj -> D:\Other\Documents\GitHub\my_modules\CyclePeakLookahead\x64\Debug\CyclePeakLookahead.dll

@@ -1,21 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<PluginList>
-	<Plugin id="CyclePeakLookahead" name="CyclePeakLookahead" category="Modifiers">
-		<Audio>
-			<!-- Mono audio input -->
-			<Pin name="Input" datatype="float" rate="audio" direction="in"/>
-			<!-- Mono audio output -->
-			<Pin name="Output" datatype="float" rate="audio" direction="out"/>
-		</Audio>
-		<Control>
-			<!-- Lookahead in milliseconds, default 10ms -->
-			<FloatInPin name="LookaheadMs" default="10.0"/>
-			<!-- Hysteresis for peak decay, default 0.01 -->
-			<FloatInPin name="Hysteresis" default="0.01"/>
-			<!-- Absolute mode: 0 = off, 1 = on, default 1 -->
-			<IntInPin name="AbsMode" default="1"/>
-			<!-- Peak output -->
-			<FloatOutPin name="Peak"/>
-		</Control>
-	</Plugin>
-</PluginList>
+<Module>
+  <Name>CyclePeakLookahead</Name>
+  <Vendor>YourNameOrCompany</Vendor>
+  <Description>
+    Audio module that delays the signal up to 30 ms and provides a lookahead
+    peak detection output with optional absolute mode and hysteresis.
+  </Description>
+
+  <Pin name="Input" datatype="float" direction="in" rate="audio" />
+  <Pin name="Output" datatype="float" direction="out" rate="audio" />
+  <Pin name="Peak" datatype="float" direction="out" rate="control" />
+  <Pin name="Lookahead (ms)" datatype="float" direction="in" default="5" />
+  <Pin name="Hysteresis" datatype="float" direction="in" default="0.001" />
+  <Pin name="Absolute Mode" datatype="int" direction="in" default="0" />
+</Module>
