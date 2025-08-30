@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Module>
   <Name>CyclePeakLookahead</Name>
-  <Vendor>YourNameOrCompany</Vendor>
+  <Vendor>Road_within_Spacetime</Vendor>
   <Description>
     Audio module that delays the signal up to 30 ms and provides a lookahead
     peak detection output with optional absolute mode and hysteresis.
