@@ -75,7 +75,7 @@
     <Text Include="CyclePeakLookahead.def.TXT" />
   </ItemGroup>
   <ItemGroup>
-    <Xml Include="CyclePeakLookahead.xml" />
+    <CustomBuild Include="CyclePeakLookahead.xml" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
