@@ -52,7 +52,7 @@
     <Text Include="CyclePeakLookahead.def.TXT" />
   </ItemGroup>
   <ItemGroup>
-    <Xml Include="CyclePeakLookahead.xml.xml">
+    <Xml Include="CyclePeakLookahead.xml">
       <Filter>Resource Files</Filter>
     </Xml>
   </ItemGroup>
