@@ -1,1 +1,3 @@
-IDR_GMPXML1 GMPXML "CyclePeakLookahead.xml"
+#include "resource.h"
+
+IDR_GMPXML1   GMPXML   "CyclePeakLookahead.xml"

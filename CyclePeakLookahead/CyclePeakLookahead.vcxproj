@@ -68,11 +68,10 @@
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
-    <!-- 👇 Add the resource script -->
-    <ResourceCompile Include="CyclePeakLookahead.rc" />
+    <Text Include="CyclePeakLookahead.def.TXT" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="CyclePeakLookahead.def.TXT" />
+    <ResourceCompile Include="CyclePeakLookahead.rc" />
   </ItemGroup>
   <ItemGroup>
     <Xml Include="CyclePeakLookahead.xml" />
