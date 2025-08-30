@@ -3,8 +3,8 @@
   "WorkspaceRootPath": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|solutionrelative:CyclePeakLookahead.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+      "AbsoluteMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.xml||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
+      "RelativeMoniker": "D:0:0:{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}|CyclePeakLookahead.vcxproj|solutionrelative:CyclePeakLookahead.xml||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
     }
   ],
   "DocumentGroupContainers": [
@@ -19,14 +19,14 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "CyclePeakLookahead.cpp",
-              "DocumentMoniker": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.cpp",
-              "RelativeDocumentMoniker": "CyclePeakLookahead.cpp",
-              "ToolTip": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.cpp",
-              "RelativeToolTip": "CyclePeakLookahead.cpp",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAVAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2025-08-26T20:19:11.895Z",
+              "Title": "CyclePeakLookahead.xml",
+              "DocumentMoniker": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.xml",
+              "RelativeDocumentMoniker": "CyclePeakLookahead.xml",
+              "ToolTip": "D:\\Other\\Documents\\GitHub\\my_modules\\CyclePeakLookahead\\CyclePeakLookahead.xml",
+              "RelativeToolTip": "CyclePeakLookahead.xml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003576|",
+              "WhenOpened": "2025-08-30T22:05:21.958Z",
               "EditorCaption": ""
             }
           ]
