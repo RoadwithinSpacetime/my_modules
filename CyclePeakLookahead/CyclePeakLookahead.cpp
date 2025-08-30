@@ -1,4 +1,3 @@
-//#define NOMINMAX
 #include "CyclePeakLookahead.h"
 
 #undef max
@@ -49,7 +48,6 @@ void CyclePeakLookahead::updateLookahead()
     if (lookaheadSamples_ < 0) lookaheadSamples_ = 0;
 }
 
-//void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
 void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
 {
     float* in = pinIn_.getBuffer() + bufferOffset;
