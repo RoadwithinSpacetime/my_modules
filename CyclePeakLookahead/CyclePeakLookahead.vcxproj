@@ -68,7 +68,7 @@
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="CyclePeakLookahead.def.TXT" />
+    <Text Include="CyclePeakLookahead.def" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CyclePeakLookahead.rc" />
