@@ -6,10 +6,11 @@
 			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
 		</Audio>
 		<Parameters>
+			<Pin name="Lookahead (ms)" datatype="float" direction="in" rate="control" default="5" min="0" max="30"/>
+			<Pin name="Hysteresis" datatype="float" direction="in" rate="control" default="0.001" min="0" max="1"/>
+			<Pin name="Absolute Mode" datatype="float" direction="in" rate="control" default="0" min="0" max="1"/>
 			<Pin name="Peak" datatype="float" direction="out" rate="control"/>
-			<Pin name="Lookahead (ms)" datatype="float" direction="in" default="5" min="0" max="30"/>
-			<Pin name="Hysteresis" datatype="float" direction="in" default="0.001" min="0"/>
-			<Pin name="Absolute Mode" datatype="int" direction="in" default="0"/>
+
 		</Parameters>
 		<Vendor>Road_within_Spacetime</Vendor>
 		<Description>

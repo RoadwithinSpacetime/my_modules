@@ -51,7 +51,7 @@ int32_t CyclePeakLookahead::open()
 void CyclePeakLookahead::onSetPins()
 {
     hysteresis_ = std::max(0.0f, static_cast<float>(pinHysteresis_.getValue()));
-    absMode_ = pinAbsMode_.getValue() != 0;
+    absMode_ = pinAbsMode_.getValue() != 0.0f;
     updateLookahead();
 }
 
