@@ -2,7 +2,7 @@
 
 #undef max
 
-REGISTER_PLUGIN(CyclePeakLookahead, L"CyclePeakLookahead");
+REGISTER_PLUGIN(CyclePeakLookahead, L"CyclePeakLookahead_SE");
 
 CyclePeakLookahead::CyclePeakLookahead(IMpUnknown* host)
     : MpBase(host),
