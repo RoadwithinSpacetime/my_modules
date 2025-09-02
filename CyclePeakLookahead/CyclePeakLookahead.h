@@ -28,17 +28,17 @@ private:
     IntInPin     pinAbsMode_;
 
     // --- State ---
-    double sampleRate_ = 44100.0;
-    size_t maxLookaheadSamples_ = 0;
-    size_t lookaheadSamples_ = 0;
+    double sampleRate_;
+    size_t maxLookaheadSamples_;
+    size_t lookaheadSamples_;
 
     std::vector<float> delay_;
-    size_t delayWrite_ = 0;
-    size_t delayRead_ = 0;
+    size_t delayWrite_;
+    size_t delayRead_;
 
     // cycle peak detection
-    float cyclePeak_ = 0.0f;
-    float lastSample_ = 0.0f;
-    float hysteresis_ = 0.001f;
-    bool absMode_ = false;
+    float cyclePeak_;
+    float lastSample_;
+    float hysteresis_;
+    bool absMode_;
 };
