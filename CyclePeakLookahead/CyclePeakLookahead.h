@@ -36,7 +36,6 @@ private:
     size_t delayWrite_;
     size_t delayRead_;
 
-    // cycle peak detection
     float cyclePeak_;
     float lastSample_;
     float hysteresis_;

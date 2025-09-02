@@ -32,6 +32,7 @@ CyclePeakLookahead::CyclePeakLookahead(IMpUnknown* host)
     // initialize delay buffer
     maxLookaheadSamples_ = static_cast<size_t>(0.03 * sampleRate_);
     delay_.assign(maxLookaheadSamples_ + 256, 0.0f);
+    delayRead_ = 0;
 }
 
 int32_t CyclePeakLookahead::open()
@@ -42,7 +43,6 @@ int32_t CyclePeakLookahead::open()
 
     updateLookahead();
     delayWrite_ = 0;
-    delayRead_ = (delayWrite_ + delay_.size() - lookaheadSamples_) % delay_.size();
 
     setSubProcess(static_cast<SubProcess_ptr>(&CyclePeakLookahead::subProcess));
     return MpBase::open();
@@ -51,20 +51,22 @@ int32_t CyclePeakLookahead::open()
 void CyclePeakLookahead::onSetPins()
 {
     hysteresis_ = std::max(0.0f, static_cast<float>(pinHysteresis_.getValue()));
-    absMode_ = pinAbsMode_.getValue() != 0.0f;
+    absMode_ = pinAbsMode_.getValue() != 0;
+
     updateLookahead();
 }
 
 void CyclePeakLookahead::updateLookahead()
 {
-    double samples = pinLookaheadMs_.getValue() * 0.001 * sampleRate_;
-    if (samples < 0.0) samples = 0.0;
+    // Clamp lookahead to safe range
+    float lookaheadMs = std::clamp(static_cast<float>(pinLookaheadMs_.getValue()), 0.0f, 30.0f);
+    double samples = lookaheadMs * 0.001 * sampleRate_;
 
-    lookaheadSamples_ = static_cast<size_t>(samples);
+    lookaheadSamples_ = std::max<size_t>(1, static_cast<size_t>(samples));
+
     if (lookaheadSamples_ > maxLookaheadSamples_)
         lookaheadSamples_ = maxLookaheadSamples_;
 
-    // safe delayRead_ initialization
     if (!delay_.empty())
         delayRead_ = (delayWrite_ + delay_.size() - lookaheadSamples_) % delay_.size();
     else
@@ -82,8 +84,8 @@ void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
         float xAbs = absMode_ ? std::fabs(x) : x;
 
         // --- Delay / lookahead ---
-        float y = x;  // fallback if delay empty
-        if (!delay_.empty())
+        float y = x;
+        if (!delay_.empty() && lookaheadSamples_ > 0)
         {
             delay_[delayWrite_] = x;
             delayWrite_ = (delayWrite_ + 1) % delay_.size();
