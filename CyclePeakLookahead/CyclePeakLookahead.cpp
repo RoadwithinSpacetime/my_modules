@@ -43,7 +43,8 @@ void CyclePeakLookahead::updateLookahead()
 {
     sampleRate_ = getSampleRate();
 
-    lookaheadSamples_ = static_cast<int>(pinLookaheadMs_.getValue() * 0.001f * sampleRate_);
+    int64_t temp = static_cast<int64_t>(pinLookaheadMs_.getValue() * 0.001f * sampleRate_);
+
     if (lookaheadSamples_ > maxLookaheadSamples_) lookaheadSamples_ = maxLookaheadSamples_;
     if (lookaheadSamples_ < 0) lookaheadSamples_ = 0;
 }
@@ -75,5 +76,6 @@ void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
         out[s] = y;
     }
 
-    pinPeak_ = currentPeak_;
+    pinPeak_.setValue(currentPeak_);
+
 }
