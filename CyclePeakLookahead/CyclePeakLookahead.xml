@@ -7,8 +7,8 @@
 		</Audio>
 		<Parameters>
 			<Pin name="Peak" datatype="float" direction="out" rate="control"/>
-			<Pin name="Lookahead (ms)" datatype="float" direction="in" default="5"/>
-			<Pin name="Hysteresis" datatype="float" direction="in" default="0.001"/>
+			<Pin name="Lookahead (ms)" datatype="float" direction="in" default="5" min="0" max="30"/>
+			<Pin name="Hysteresis" datatype="float" direction="in" default="0.001" min="0"/>
 			<Pin name="Absolute Mode" datatype="int" direction="in" default="0"/>
 		</Parameters>
 		<Vendor>Road_within_Spacetime</Vendor>

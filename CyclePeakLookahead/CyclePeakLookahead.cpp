@@ -4,6 +4,7 @@
 
 REGISTER_PLUGIN(CyclePeakLookahead, L"CyclePeakLookahead");
 
+
 CyclePeakLookahead::CyclePeakLookahead(IMpUnknown* host)
     : MpBase(host)
 {
@@ -13,7 +14,24 @@ CyclePeakLookahead::CyclePeakLookahead(IMpUnknown* host)
     initializePin(pinLookaheadMs_);
     initializePin(pinHysteresis_);
     initializePin(pinAbsMode_);
+
+    // set default values
+    pinLookaheadMs_.setValue(5.0f);
+    pinHysteresis_.setValue(0.001f);
+    pinAbsMode_.setValue(0);
+    pinPeak_.setValue(0.0f);
+
+    // safe initial state
+    sampleRate_ = 44100.0;
+    maxLookaheadSamples_ = static_cast<size_t>(0.03 * sampleRate_);
+    lookaheadSamples_ = 1;        // avoid divide/mod by 0
+    delay_.assign(maxLookaheadSamples_ + 256, 0.0f);
+    delayWrite_ = 0;
+    delayRead_ = 0;
+    cyclePeak_ = 0.0f;
+    lastSample_ = 0.0f;
 }
+
 
 int32_t CyclePeakLookahead::open()
 {
@@ -85,7 +103,7 @@ void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
         // --- Cycle peak detection ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            pinPeak_ = cyclePeak_;
+            pinPeak_.setValue(cyclePeak_);
             cyclePeak_ = 0.0f;
         }
 
