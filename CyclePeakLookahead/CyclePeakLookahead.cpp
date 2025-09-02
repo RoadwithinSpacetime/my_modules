@@ -20,7 +20,12 @@ int32_t CyclePeakLookahead::open()
     sampleRate_ = getSampleRate();
     maxLookaheadSamples_ = static_cast<size_t>(std::ceil(0.03 * sampleRate_));
 
+    // ensure valid size
+    assert(maxLookaheadSamples_ > 0);
+
     delay_.assign(maxLookaheadSamples_ + 256, 0.0f);
+    assert(!delay_.empty());
+
     delayWrite_ = 0;
     lookaheadSamples_ = 0;
     updateLookahead();
@@ -42,17 +47,24 @@ void CyclePeakLookahead::onSetPins()
 void CyclePeakLookahead::updateLookahead()
 {
     sampleRate_ = getSampleRate();
+    assert(sampleRate_ > 0.0);
 
-    lookaheadSamples_ = static_cast<size_t>(
-        std::max(0.0, pinLookaheadMs_.getValue() * 0.001 * sampleRate_)
-        );
+    double samples = pinLookaheadMs_.getValue() * 0.001 * sampleRate_;
+    if (samples < 0.0)
+        samples = 0.0;
 
+    lookaheadSamples_ = static_cast<size_t>(samples);
     if (lookaheadSamples_ > maxLookaheadSamples_)
         lookaheadSamples_ = maxLookaheadSamples_;
+
+    assert(lookaheadSamples_ <= delay_.size());
 }
 
 void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
 {
+    assert(bufferOffset >= 0 && sampleFrames > 0);
+    assert(delay_.size() > 0);
+
     float* in = pinIn_.getBuffer() + bufferOffset;
     float* out = pinOut_.getBuffer() + bufferOffset;
 
@@ -62,16 +74,17 @@ void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
         float xAbs = absMode_ ? std::fabs(x) : x;
 
         // --- Delay line (lookahead) ---
+        assert(delayWrite_ < delay_.size());
         delay_[delayWrite_] = x;
         delayWrite_ = (delayWrite_ + 1) % delay_.size();
 
+        assert(delayRead_ < delay_.size());
         float y = delay_[delayRead_];
         delayRead_ = (delayRead_ + 1) % delay_.size();
 
         // --- Cycle peak detection ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            // output the peak of the last cycle
             pinPeak_ = cyclePeak_;
             cyclePeak_ = 0.0f;
         }

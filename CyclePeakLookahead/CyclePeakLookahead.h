@@ -5,6 +5,7 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <cassert>
 
 class CyclePeakLookahead : public MpBase
 {
