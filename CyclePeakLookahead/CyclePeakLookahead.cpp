@@ -18,7 +18,7 @@ CyclePeakLookahead::CyclePeakLookahead(IMpUnknown* host)
 int32_t CyclePeakLookahead::open()
 {
     sampleRate_ = getSampleRate();
-    maxLookaheadSamples_ = static_cast<int>(ceil(0.03f * sampleRate_));
+    maxLookaheadSamples_ = static_cast<size_t>(std::ceil(0.03 * sampleRate_));
 
     delay_.assign(maxLookaheadSamples_ + 256, 0.0f);
     delayWrite_ = 0;
@@ -43,10 +43,12 @@ void CyclePeakLookahead::updateLookahead()
 {
     sampleRate_ = getSampleRate();
 
-    int64_t temp = static_cast<int64_t>(pinLookaheadMs_.getValue() * 0.001f * sampleRate_);
+    lookaheadSamples_ = static_cast<size_t>(
+        std::max(0.0, pinLookaheadMs_.getValue() * 0.001 * sampleRate_)
+        );
 
-    if (lookaheadSamples_ > maxLookaheadSamples_) lookaheadSamples_ = maxLookaheadSamples_;
-    if (lookaheadSamples_ < 0) lookaheadSamples_ = 0;
+    if (lookaheadSamples_ > maxLookaheadSamples_)
+        lookaheadSamples_ = maxLookaheadSamples_;
 }
 
 void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
@@ -69,8 +71,8 @@ void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
         // --- Cycle peak detection ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            // New cycle starts: output the peak of the last cycle
-            pinPeak_.setValue(cyclePeak_);
+            // output the peak of the last cycle
+            pinPeak_ = cyclePeak_;
             cyclePeak_ = 0.0f;
         }
 

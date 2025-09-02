@@ -15,7 +15,6 @@ public:
     void onSetPins() override;
 
 private:
-    // --- Processing ---
     void subProcess(int bufferOffset, int sampleFrames);
     void updateLookahead();
 
@@ -28,20 +27,17 @@ private:
     IntInPin     pinAbsMode_;
 
     // --- State ---
-    double sampleRate_{ 44100.0 };
-    int maxLookaheadSamples_{ 0 };
-    int lookaheadSamples_{ 0 };
+    double sampleRate_ = 44100.0;
+    size_t maxLookaheadSamples_ = 0;
+    size_t lookaheadSamples_ = 0;
 
     std::vector<float> delay_;
-    int delayWrite_{ 0 };
-    int delayRead_{ 0 };
+    size_t delayWrite_ = 0;
+    size_t delayRead_ = 0;
 
-    // --- Cycle Peak Detection ---
-    float lastSample_{ 0.0f };
-    float cyclePeak_{ 0.0f };
-
-    // --- Options ---
-    float hysteresis_{ 0.0f }; // (still included if you want it later)
-    bool absMode_{ false };
+    // cycle peak detection
+    float cyclePeak_ = 0.0f;
+    float lastSample_ = 0.0f;
+    float hysteresis_ = 0.001f;
+    bool absMode_ = false;
 };
-
