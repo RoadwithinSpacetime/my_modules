@@ -12,7 +12,7 @@ public:
     CyclePeakLookahead(IMpUnknown* host);
 
     int32_t open() override;
-    void subProcess(int bufferOffset, int sampleFrames); // matches SDK3 SubProcess_ptr
+    void subProcess(int bufferOffset, int sampleFrames);
     void onSetPins() override;
 
 private:
