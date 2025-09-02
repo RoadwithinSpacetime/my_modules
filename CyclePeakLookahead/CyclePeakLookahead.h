@@ -12,32 +12,36 @@ public:
     CyclePeakLookahead(IMpUnknown* host);
 
     int32_t open() override;
-    void subProcess(int bufferOffset, int sampleFrames);
     void onSetPins() override;
 
 private:
+    // --- Processing ---
+    void subProcess(int bufferOffset, int sampleFrames);
     void updateLookahead();
 
-    // Pins
-    AudioInPin  pinIn_;
-    AudioOutPin pinOut_;
-    FloatOutPin pinPeak_;
-    FloatInPin  pinLookaheadMs_;
-    FloatInPin  pinHysteresis_;
-    IntInPin    pinAbsMode_;
+    // --- Pins ---
+    AudioInPin   pinIn_;
+    AudioOutPin  pinOut_;
+    FloatOutPin  pinPeak_;
+    FloatInPin   pinLookaheadMs_;
+    FloatInPin   pinHysteresis_;
+    IntInPin     pinAbsMode_;
 
-    // Delay buffer
+    // --- State ---
+    double sampleRate_{ 44100.0 };
+    int maxLookaheadSamples_{ 0 };
+    int lookaheadSamples_{ 0 };
+
     std::vector<float> delay_;
-    size_t delayWrite_ = 0;
-    size_t delayRead_ = 0;
+    int delayWrite_{ 0 };
+    int delayRead_{ 0 };
 
-    // Peak tracking
-    float currentPeak_ = 0.0f;
-    int lookaheadSamples_ = 0;
-    int maxLookaheadSamples_ = 0;
+    // --- Cycle Peak Detection ---
+    float lastSample_{ 0.0f };
+    float cyclePeak_{ 0.0f };
 
-    // Settings
-    float sampleRate_ = 44100.0f;
-    float hysteresis_ = 0.0f;
-    bool absMode_ = false;
+    // --- Options ---
+    float hysteresis_{ 0.0f }; // (still included if you want it later)
+    bool absMode_{ false };
 };
+

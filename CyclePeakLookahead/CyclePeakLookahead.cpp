@@ -57,25 +57,29 @@ void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
-        if (absMode_) x = std::fabs(x);
+        float xAbs = absMode_ ? std::fabs(x) : x;
 
+        // --- Delay line (lookahead) ---
         delay_[delayWrite_] = x;
         delayWrite_ = (delayWrite_ + 1) % delay_.size();
 
         float y = delay_[delayRead_];
         delayRead_ = (delayRead_ + 1) % delay_.size();
 
-        if (x > currentPeak_)
-            currentPeak_ = x;
-        else
+        // --- Cycle peak detection ---
+        if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            currentPeak_ -= hysteresis_;
-            if (currentPeak_ < 0.0f) currentPeak_ = 0.0f;
+            // New cycle starts: output the peak of the last cycle
+            pinPeak_.setValue(cyclePeak_);
+            cyclePeak_ = 0.0f;
         }
 
+        if (xAbs > cyclePeak_)
+            cyclePeak_ = xAbs;
+
+        lastSample_ = x;
+
+        // Output delayed signal
         out[s] = y;
     }
-
-    pinPeak_.setValue(currentPeak_);
-
 }
