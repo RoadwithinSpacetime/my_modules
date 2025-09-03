@@ -6,38 +6,40 @@
 #include <cmath>
 #include <algorithm>
 
-class CyclePeakLookahead : public MpBase
-{
-public:
-    CyclePeakLookahead(IMpUnknown* host);
+using namespace gmpi;
 
-    int32_t open() override;
+class CyclePeakLookahead : public MpBase2
+{
+    // Pins
+    AudioInPin pinIn;
+    AudioOutPin pinOut;
+
+    FloatOutPin pinPeak;
+    FloatInPin pinLookaheadMs;
+    FloatInPin pinHysteresis;
+    IntInPin   pinAbsMode;
+
+    // Internal state
+    double sampleRate_;
+    size_t maxLookaheadSamples_;
+    size_t lookaheadSamples_;
+
+    size_t delayWrite_;
+    size_t delayRead_;
+    std::vector<float> delay_;
+
+    float cyclePeak_;
+    float lastSample_;
+    float hysteresis_;
+    bool  absMode_;
+
+public:
+    CyclePeakLookahead();
+
     void onSetPins() override;
+    void subProcess(int sampleFrames);
+    int32_t open() override;
 
 private:
-    void subProcess(int bufferOffset, int sampleFrames);
     void updateLookahead();
-
-    // --- Pins ---
-    AudioInPin   pinIn_;
-    AudioOutPin  pinOut_;
-    FloatOutPin  pinPeak_;
-    FloatInPin   pinLookaheadMs_;
-    FloatInPin   pinHysteresis_;
-    IntInPin     pinAbsMode_;
-
-    // --- State ---
-    double sampleRate_ = 44100.0;       // will be updated in open()
-    size_t maxLookaheadSamples_ = 0;    // max delay based on 30 ms
-    size_t lookaheadSamples_ = 0;       // actual lookahead set by user
-
-    std::vector<float> delay_;
-    size_t delayWrite_ = 0;
-    size_t delayRead_ = 0;
-
-    // --- Cycle peak detection ---
-    float cyclePeak_ = 0.0f;
-    float lastSample_ = 0.0f;
-    float hysteresis_ = 0.001f;
-    bool  absMode_ = false;
 };
