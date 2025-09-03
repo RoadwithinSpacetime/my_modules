@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
-	<Plugin id="CyclePeakLookahead" name="CyclePeakLookahead_SE" category="Modifiers">
+	<Plugin id="CyclePeakLookahead_SE" name="CyclePeakLookahead" category="Modifiers">
 		<Audio>
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
 			<Pin name="Output" datatype="float" direction="out" rate="audio"/>

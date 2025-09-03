@@ -5,7 +5,6 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
-#include <cassert>
 
 class CyclePeakLookahead : public MpBase
 {
@@ -28,16 +27,17 @@ private:
     IntInPin     pinAbsMode_;
 
     // --- State ---
-    double sampleRate_;
-    size_t maxLookaheadSamples_;
-    size_t lookaheadSamples_;
+    double sampleRate_ = 44100.0;       // will be updated in open()
+    size_t maxLookaheadSamples_ = 0;    // max delay based on 30 ms
+    size_t lookaheadSamples_ = 0;       // actual lookahead set by user
 
     std::vector<float> delay_;
-    size_t delayWrite_;
-    size_t delayRead_;
+    size_t delayWrite_ = 0;
+    size_t delayRead_ = 0;
 
-    float cyclePeak_;
-    float lastSample_;
-    float hysteresis_;
-    bool absMode_;
+    // --- Cycle peak detection ---
+    float cyclePeak_ = 0.0f;
+    float lastSample_ = 0.0f;
+    float hysteresis_ = 0.001f;
+    bool  absMode_ = false;
 };
