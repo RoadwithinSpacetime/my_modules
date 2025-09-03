@@ -1,5 +1,5 @@
 #pragma once
-#include "../se_sdk3/mp_sdk_audio.h"
+#include "mp_sdk_audio.h"
 
 using namespace gmpi;
 
@@ -9,14 +9,14 @@ public:
     CyclePeakLookahead();
 
     int32_t open() override;
-    void subProcess(int sampleFrames);
     void onSetPins() override;
+    void subProcess(int bufferOffset, int sampleFrames);
 
 private:
     AudioInPin pinIn_;
     AudioOutPin pinOut_;
     FloatOutPin pinPeak_;
 
-    float cyclePeak_;
     float lastSample_;
+    float cyclePeak_;
 };
