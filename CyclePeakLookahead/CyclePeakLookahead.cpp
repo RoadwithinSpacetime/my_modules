@@ -1,36 +1,44 @@
 #include "CyclePeakLookahead.h"
+#include <cmath>
 
 CyclePeakLookahead::CyclePeakLookahead()
 {
-    initializePin(pinIn);
-    initializePin(pinOut);
-}
-
-int32_t CyclePeakLookahead::open()
-{
-    // Always set the processing method.
-    setSubProcess(&CyclePeakLookahead::subProcess);
-    return MpBase2::open();
-}
-
-void CyclePeakLookahead::onSetPins()
-{
-    // Pass audio through.
-    pinOut.setStreaming(pinIn.isStreaming());
+    initializePin(pinIn_);
+    initializePin(pinOut_);
+    initializePin(pinPeak_);
 }
 
 void CyclePeakLookahead::subProcess(int sampleFrames)
 {
-    auto in = getBuffer(pinIn);
-    auto out = getBuffer(pinOut);
+    float* in = getBuffer(pinIn_);
+    float* out = getBuffer(pinOut_);
 
     for (int s = 0; s < sampleFrames; ++s)
     {
-        out[s] = in[s]; // x = y
+        float x = in[s];
+
+        // --- Cycle peak detection ---
+        if (lastSample_ <= 0.0f && x > 0.0f)
+        {
+            pinPeak_.setValue(cyclePeak_);
+            cyclePeak_ = 0.0f;
+        }
+
+        if (x > cyclePeak_)
+            cyclePeak_ = x;
+
+        lastSample_ = x;
+
+        // --- Pass-through ---
+        out[s] = x;
     }
 }
 
-// Register the module
+void CyclePeakLookahead::onSetPins()
+{
+    setSubProcess(&CyclePeakLookahead::subProcess);
+}
+
 namespace
 {
     auto r = Register<CyclePeakLookahead>::withId(L"CyclePeakLookahead_SE");

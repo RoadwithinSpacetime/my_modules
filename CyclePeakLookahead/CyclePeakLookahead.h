@@ -5,14 +5,17 @@ using namespace gmpi;
 
 class CyclePeakLookahead : public MpBase2
 {
-    // Pins
-    AudioInPin  pinIn;
-    AudioOutPin pinOut;
+public:
+    AudioInPin pinIn_;
+    AudioOutPin pinOut_;
+    FloatOutPin pinPeak_;
+
+private:
+    float cyclePeak_ = 0.0f;
+    float lastSample_ = 0.0f;
 
 public:
     CyclePeakLookahead();
-
-    void onSetPins() override;
     void subProcess(int sampleFrames);
-    int32_t open() override;
+    void onSetPins() override;
 };

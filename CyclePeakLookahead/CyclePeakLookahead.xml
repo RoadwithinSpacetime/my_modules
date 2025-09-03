@@ -5,9 +5,12 @@
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
 			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
 		</Audio>
+		<Parameters>
+			<Pin name="Peak" datatype="float" direction="out" rate="control"/>
+		</Parameters>
 		<Vendor>Road_within_Spacetime</Vendor>
 		<Description>
-			Minimal pass-through module: copies input to output (x = y).
+			Cycle peak detector: outputs the peak of each positive-going cycle.
 		</Description>
 	</Plugin>
 </PluginList>
