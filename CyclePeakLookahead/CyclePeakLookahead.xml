@@ -7,10 +7,13 @@
 		</Audio>
 		<Parameters>
 			<Pin name="Peak" datatype="float" direction="out" rate="control"/>
+			<Pin name="Lookahead (ms)" datatype="float" direction="in" default="5"/>
+			<Pin name="Hysteresis" datatype="float" direction="in" default="0.001"/>
+			<Pin name="Absolute Mode" datatype="int" direction="in" default="0"/>
 		</Parameters>
 		<Vendor>Road_within_Spacetime</Vendor>
 		<Description>
-			Cycle peak detector: outputs the peak of each positive-going cycle.
+			Audio module that delays the signal up to 30 ms and provides a lookahead peak detection output with optional absolute mode and hysteresis.
 		</Description>
 	</Plugin>
 </PluginList>

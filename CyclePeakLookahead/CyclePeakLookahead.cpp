@@ -1,17 +1,41 @@
 #include "CyclePeakLookahead.h"
 #include <cmath>
 
+using namespace gmpi;
+
 CyclePeakLookahead::CyclePeakLookahead()
-{
+    {
+    // Safe to initialize pins in constructor
     initializePin(pinIn_);
     initializePin(pinOut_);
     initializePin(pinPeak_);
 }
 
-void CyclePeakLookahead::subProcess(int sampleFrames)
+int32_t CyclePeakLookahead::open()
 {
-    float* in = getBuffer(pinIn_);
-    float* out = getBuffer(pinOut_);
+    // Reset internal state
+    lastSample_ = 0.0f;
+    cyclePeak_ = 0.0f;
+
+    // Set default output values
+    pinPeak_.setValue(0.0f);
+
+    // Register the processing callback
+    setSubProcess(&CyclePeakLookahead::subProcess);
+
+    return MpBase2::open();
+}
+
+void CyclePeakLookahead::onSetPins()
+{
+    // Called when control pins change
+    // No control pins in this simple version yet
+}
+
+void CyclePeakLookahead::subProcess(int bufferOffset, int sampleFrames)
+{
+    float* in = getBuffer(pinIn_) + bufferOffset;
+    float* out = getBuffer(pinOut_) + bufferOffset;
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -34,11 +58,8 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     }
 }
 
-void CyclePeakLookahead::onSetPins()
-{
-    setSubProcess(&CyclePeakLookahead::subProcess);
-}
 
+// Register plugin with SE
 namespace
 {
     auto r = Register<CyclePeakLookahead>::withId(L"CyclePeakLookahead_SE");
