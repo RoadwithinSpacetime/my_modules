@@ -3,11 +3,14 @@
 using namespace gmpi;
 
 CyclePeakLookahead::CyclePeakLookahead()
+    : lastSample_(0.0f)
+    , cyclePeak_(0.0f)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
     initializePin(pinPeak_);
 }
+
 
 int32_t CyclePeakLookahead::open()
 {
