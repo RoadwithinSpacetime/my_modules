@@ -1,7 +1,7 @@
 <SEModule>
 	<Name>CyclePeakLookahead</Name>
 	<Id>CyclePeakLookahead_SE</Id>
-	<Description>Cycle peak detection example</Description>
+	<Description>Cycle peak detection (SE1.4 compatible)</Description>
 	<Pins>
 		<AudioIn name="In"/>
 		<AudioOut name="Out"/>

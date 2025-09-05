@@ -10,7 +10,7 @@ public:
 
     int32_t open() override;
     void onSetPins() override;
-    void subProcess(int bufferOffset, int sampleFrames);
+    void subProcess(int sampleFrames); // SE1.4-compatible signature
 
 private:
     AudioInPin pinIn_;
