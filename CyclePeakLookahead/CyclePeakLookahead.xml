@@ -1,11 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="CyclePeakLookahead_SE" name="CyclePeakLookahead" category="Modifiers">
-		<Description>Cycle peak detection (SE1.4 compatible)</Description>
-		<Pins>
-			<AudioIn name="In"/>
-			<AudioOut name="Out"/>
-			<FloatOut name="Peak"/>
-		</Pins>
+		<Description>Cycle peak detection (SE1.4/SE1.5 compatible)</Description>
+
+		<Audio>
+			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
+			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
+		</Audio>
+
+		<Parameters>
+			<Pin name="Peak" datatype="float" direction="out" rate="control"/>
+		</Parameters>
+
+		<Vendor>Road_within_Spacetime</Vendor>
 	</Plugin>
 </PluginList>
