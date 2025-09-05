@@ -1,4 +1,5 @@
 #include "CyclePeakLookahead.h"
+#undef max
 
 using namespace gmpi;
 
@@ -15,13 +16,13 @@ CyclePeakLookahead::CyclePeakLookahead()
 
 int32_t CyclePeakLookahead::open()
 {
-    sampleRate_ = getSampleRate(); // <-- set sample rate
+    sampleRate_ = getSampleRate();
 
     lastSample_ = 0.0f;
     cyclePeak_ = 0.0f;
 
-    // Compute lookahead buffer size (30 ms)
-    lookaheadSamples_ = static_cast<int>(0.03f * sampleRate_);
+    // 30 ms lookahead buffer
+    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
@@ -31,7 +32,6 @@ int32_t CyclePeakLookahead::open()
 
     return MpBase2::open();
 }
-
 
 void CyclePeakLookahead::onSetPins()
 {
@@ -49,6 +49,8 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !peakOut)
         return;
 
+    static float previousCyclePeak = 0.0f;
+
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
@@ -56,6 +58,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         // --- Cycle peak detection ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
+            previousCyclePeak = cyclePeak_;
             cyclePeak_ = 0.0f; // start new cycle
         }
 
@@ -66,11 +69,16 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         // --- Write to lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
-        bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
 
-        // --- Output ---
-        out[s] = lookaheadBuffer_[bufferWritePos_];    // delayed by 30 ms
-        peakOut[s] = cyclePeak_;                       // current cycle peak
+        // --- Read delayed sample ---
+        int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
+        out[s] = lookaheadBuffer_[readPos];
+
+        // --- Output cycle peak (with carryover) ---
+        peakOut[s] = std::max(cyclePeak_, previousCyclePeak);
+
+        // --- Increment buffer write position ---
+        bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
 }
 
