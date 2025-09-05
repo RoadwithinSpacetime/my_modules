@@ -10,12 +10,12 @@ public:
 
     int32_t open() override;
     void onSetPins() override;
-    void subProcess(int sampleFrames); // SE1.4-compatible signature
+    void subProcess(int sampleFrames);
 
 private:
     AudioInPin pinIn_;
     AudioOutPin pinOut_;
-    FloatOutPin pinPeak_;
+    AudioOutPin pinPeak_;
 
     float lastSample_;
     float cyclePeak_;
