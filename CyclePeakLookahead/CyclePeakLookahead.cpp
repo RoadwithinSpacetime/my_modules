@@ -4,10 +4,6 @@
 #undef max
 #undef min
 
-// Uncomment to track absolute (full-wave) peak per cycle.
-// Leave commented to track positive-only peak.
-// #define FULL_WAVE_PEAK
-
 CyclePeakLookahead::CyclePeakLookahead()
     : bufferWritePos_(0)
     , lookaheadSamples_(0)
@@ -67,7 +63,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     {
         const float x = in[s];
 
-        // 1) Output current delayed audio + scheduled held-peak (read-before-write ring)
+        // 1) Output current delayed audio + scheduled held-peak
         out[s] = lookaheadBuffer_[bufferWritePos_];
         peakOut[s] = peakHoldBuffer_[bufferWritePos_];
 
@@ -76,23 +72,14 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         if (posZero)
         {
-            // We just finished the previous cycle. We know its peak (cyclePeak_)
-            // and its length (samplesSinceCycleStart_ = D).
+            // Previous cycle finished, schedule its peak into the lookahead peak buffer
             const int D = samplesSinceCycleStart_;
 
             if (D > 0)
             {
-                // We need that peak to appear at the start of the SAME cycle's
-                // delayed audio and be held for D samples.
-                // Map future output times to buffer indices:
-                //
-                // The delayed start of the finished cycle occurs in (L - D) samples from now.
-                // If D <= L, we can schedule the entire cycle ahead of time.
-                // If D > L, the start has already passed; schedule the remaining part.
-
-                int offset = L - D;                 // samples until delayed cycle start
-                int startK = offset < 0 ? -offset : 0; // portion already passed if cycle > L
-                int nToWrite = D - startK;             // remaining portion to schedule
+                int offset = L - D;
+                int startK = offset < 0 ? -offset : 0;
+                int nToWrite = D - startK;
 
                 if (nToWrite > 0)
                 {
@@ -105,17 +92,13 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 }
             }
 
-            // Reset for the new cycle (which begins at this sample)
+            // Reset for the new cycle
             samplesSinceCycleStart_ = 0;
             cyclePeak_ = 0.0f;
         }
 
-        // 3) Update current cycle peak (half-wave or full-wave)
-        #ifdef FULL_WAVE_PEAK
-        const float v = std::fabs(x);
-        #else
-        const float v = x;
-        #endif
+        // 3) Update current cycle peak (full-wave)
+        const float v = std::fabs(x);  // full-wave magnitude
         if (v > cyclePeak_)
             cyclePeak_ = v;
 
