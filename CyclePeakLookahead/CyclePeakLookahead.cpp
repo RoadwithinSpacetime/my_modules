@@ -1,7 +1,10 @@
 #include "CyclePeakLookahead.h"
-#undef max
 
-using namespace gmpi;
+#undef max
+#undef min  // protect against Windows macros
+
+// Uncomment to enable full-wave peak detection
+#define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
     : lastSample_(0.0f)
@@ -55,15 +58,21 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     {
         float x = in[s];
 
-        // --- Cycle peak detection ---
+        // --- Detect new cycle on positive zero-crossing ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             previousCyclePeak = cyclePeak_;
-            cyclePeak_ = 0.0f; // start new cycle
+            cyclePeak_ = 0.0f; // reset for new cycle
         }
 
-        if (x > cyclePeak_)
-            cyclePeak_ = x;
+        #ifdef FULL_WAVE_PEAK
+        float valueForPeak = std::fabs(x);  // track absolute excursions
+        #else
+        float valueForPeak = x;             // track positive excursions only
+        #endif
+
+        if (valueForPeak > cyclePeak_)
+            cyclePeak_ = valueForPeak;
 
         lastSample_ = x;
 
