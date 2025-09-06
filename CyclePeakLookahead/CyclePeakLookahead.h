@@ -15,14 +15,24 @@ public:
     void subProcess(int sampleFrames);
 
 private:
-    AudioInPin pinIn_;
+    // Pins
+    AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinPeak_;       // audio-rate peak
+    AudioOutPin pinPeak_; // audio-rate, per-cycle held peak aligned to delayed audio
 
-    float lastSample_;
-    float cyclePeak_;
+    // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
-    int bufferWritePos_;
-    int lookaheadSamples_;      // 30 ms in samples
+    int   bufferWritePos_;
+    int   lookaheadSamples_; // 30 ms in samples
+
+    // Scheduled per-cycle peak (aligned with delayed audio)
+    std::vector<float> peakHoldBuffer_;
+
+    // Cycle tracking
+    float  lastSample_;
+    float  cyclePeak_;
+    int    samplesSinceCycleStart_;
+
+    // Misc
     double sampleRate_;
 };
