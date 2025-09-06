@@ -9,8 +9,10 @@
 CyclePeakLookahead::CyclePeakLookahead()
     : lastSample_(0.0f)
     , cyclePeak_(0.0f)
+    , previousCyclePeak_(0.0f)
     , bufferWritePos_(0)
     , lookaheadSamples_(0)
+    , samplesSinceCycleStart_(0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -23,10 +25,13 @@ int32_t CyclePeakLookahead::open()
 
     lastSample_ = 0.0f;
     cyclePeak_ = 0.0f;
+    previousCyclePeak_ = 0.0f;
+    samplesSinceCycleStart_ = 0;
 
     // 30 ms lookahead buffer
     lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
+    peakHoldBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
     setSubProcess(&CyclePeakLookahead::subProcess);
@@ -52,8 +57,6 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !peakOut)
         return;
 
-    static float previousCyclePeak = 0.0f;
-
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
@@ -61,30 +64,35 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         // --- Detect new cycle on positive zero-crossing ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            previousCyclePeak = cyclePeak_;
-            cyclePeak_ = 0.0f; // reset for new cycle
+            // Finalize previous cycle peak
+            previousCyclePeak_ = cyclePeak_;
+            cyclePeak_ = 0.0f;  // reset for new cycle
+            samplesSinceCycleStart_ = 0; // reset cycle sample counter
         }
 
 #ifdef FULL_WAVE_PEAK
-        float valueForPeak = std::fabs(x);  // track absolute excursions
+        float valueForPeak = std::fabs(x);
 #else
-        float valueForPeak = x;             // track positive excursions only
+        float valueForPeak = x;
 #endif
 
+        // Update cycle peak
         if (valueForPeak > cyclePeak_)
             cyclePeak_ = valueForPeak;
 
         lastSample_ = x;
+        samplesSinceCycleStart_++;
 
         // --- Write to lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
 
-        // --- Read delayed sample ---
+        // --- Write previous cycle peak to peak buffer (aligned to delayed audio) ---
+        peakHoldBuffer_[bufferWritePos_] = previousCyclePeak_;
+
+        // --- Read delayed sample and peak ---
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
-
-        // --- Output cycle peak (with carryover) ---
-        peakOut[s] = std::max(cyclePeak_, previousCyclePeak);
+        peakOut[s] = peakHoldBuffer_[readPos];
 
         // --- Increment buffer write position ---
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;

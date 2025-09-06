@@ -30,8 +30,9 @@ private:
 
     // Cycle tracking
     float  lastSample_;
-    float  cyclePeak_;
-    int    samplesSinceCycleStart_;
+    float  cyclePeak_;           // max of current cycle
+    float  previousCyclePeak_;   // peak of previous cycle
+    int    samplesSinceCycleStart_; // samples since last zero-crossing
 
     // Misc
     double sampleRate_;
