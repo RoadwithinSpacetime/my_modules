@@ -90,3 +90,9 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
 }
+
+// Register plugin with SE
+namespace
+{
+    auto r = Register<CyclePeakLookahead>::withId(L"CyclePeakLookahead_SE");
+}
