@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
-	<Plugin id="CyclePeakLookahead_SE" name="CyclePeakLookahead" category="Modifiers">
+	<Plugin id="CyclePeakLookahead_SE" name="CyclePeakLookahead" category="RwS Modules">
 		<Description>Cycle peak detection (SE1.4/SE1.5 compatible, audio-rate Peak)</Description>
 
 		<Audio>
