@@ -63,54 +63,34 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     {
         const float x = in[s];
 
-        // 1) Output current delayed audio + scheduled held-peak
-        out[s] = lookaheadBuffer_[bufferWritePos_];
-        peakOut[s] = peakHoldBuffer_[bufferWritePos_];
+        // --- write current input into lookahead buffer ---
+        lookaheadBuffer_[bufferWritePos_] = x;
 
-        // 2) Detect positive zero-crossing (start of a new cycle)
-        const bool posZero = (lastSample_ <= 0.0f && x > 0.0f);
-
-        if (posZero)
-        {
-            // Previous cycle finished, schedule its peak into the lookahead peak buffer
-            const int D = samplesSinceCycleStart_;
-
-            if (D > 0)
-            {
-                int offset = L - D;
-                int startK = offset < 0 ? -offset : 0;
-                int nToWrite = D - startK;
-
-                if (nToWrite > 0)
-                {
-                    int idx = (bufferWritePos_ + startK) % L;
-                    for (int k = 0; k < nToWrite; ++k)
-                    {
-                        peakHoldBuffer_[idx] = cyclePeak_;
-                        idx = (idx + 1) % L;
-                    }
-                }
-            }
-
-            // Reset for the new cycle
-            samplesSinceCycleStart_ = 0;
-            cyclePeak_ = 0.0f;
-        }
-
-        // 3) Update current cycle peak (full-wave)
-        const float v = std::fabs(x);  // full-wave magnitude
+        // --- full-wave peak detection ---
+        const float v = std::fabs(x);
         if (v > cyclePeak_)
             cyclePeak_ = v;
 
-        // 4) Write current input sample into the audio delay
-        lookaheadBuffer_[bufferWritePos_] = x;
+        // --- write peak into lookahead peak buffer (sample-and-hold) ---
+        peakHoldBuffer_[bufferWritePos_] = cyclePeak_;
 
-        // 5) Advance ring and per-cycle counters
+        // --- detect positive zero-crossing to start a new cycle ---
+        const bool posZero = (lastSample_ <= 0.0f && x > 0.0f);
+        if (posZero)
+        {
+            cyclePeak_ = 0.0f; // reset for new cycle
+        }
+
+        // --- output delayed audio and peak ---
+        out[s] = lookaheadBuffer_[bufferWritePos_];
+        peakOut[s] = peakHoldBuffer_[bufferWritePos_];
+
+        // --- advance ring buffer ---
         bufferWritePos_ = (bufferWritePos_ + 1) % L;
-        samplesSinceCycleStart_++;
         lastSample_ = x;
     }
 }
+
 
 // Register plugin with SE
 namespace
