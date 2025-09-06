@@ -3,7 +3,6 @@
 #undef max
 #undef min  // protect against Windows macros
 
-// Uncomment to enable full-wave peak detection
 #define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
@@ -13,11 +12,13 @@ CyclePeakLookahead::CyclePeakLookahead()
     , bufferWritePos_(0)
     , lookaheadSamples_(0)
     , samplesSinceCycleStart_(0)
+    , sampleRate_(0.0)  // initialize here to silence C26495
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
     initializePin(pinPeak_);
 }
+
 
 int32_t CyclePeakLookahead::open()
 {
@@ -64,10 +65,15 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         // --- Detect new cycle on positive zero-crossing ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            // Finalize previous cycle peak
-            previousCyclePeak_ = cyclePeak_;
-            cyclePeak_ = 0.0f;  // reset for new cycle
-            samplesSinceCycleStart_ = 0; // reset cycle sample counter
+            // Cycle ended: schedule previous cycle peak at start of delayed cycle
+            // Store the measured peak of previous cycle at the position
+            // corresponding to the start of that cycle in the lookahead buffer
+            int schedulePos = (bufferWritePos_ + lookaheadSamples_ - samplesSinceCycleStart_) % lookaheadSamples_;
+            peakHoldBuffer_[schedulePos] = cyclePeak_;
+
+            // Reset for new cycle
+            cyclePeak_ = 0.0f;
+            samplesSinceCycleStart_ = 0;
         }
 
 #ifdef FULL_WAVE_PEAK
@@ -76,7 +82,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float valueForPeak = x;
 #endif
 
-        // Update cycle peak
+        // Update current cycle peak
         if (valueForPeak > cyclePeak_)
             cyclePeak_ = valueForPeak;
 
@@ -86,10 +92,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         // --- Write to lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
 
-        // --- Write previous cycle peak to peak buffer (aligned to delayed audio) ---
-        peakHoldBuffer_[bufferWritePos_] = previousCyclePeak_;
-
-        // --- Read delayed sample and peak ---
+        // --- Output delayed audio ---
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
         peakOut[s] = peakHoldBuffer_[readPos];
