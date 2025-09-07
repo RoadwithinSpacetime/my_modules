@@ -1,7 +1,7 @@
 #include "CyclePeakLookahead.h"
 
 #undef max
-#undef min
+#undef min  // protect against Windows macros
 
 #define FULL_WAVE_PEAK
 
@@ -10,7 +10,10 @@ CyclePeakLookahead::CyclePeakLookahead()
     , cyclePeak_(0.0f)
     , bufferWritePos_(0)
     , lookaheadSamples_(0)
-    , sampleRate_(0.0)
+    , lastPositiveWidth_(0)
+    , minCycleGuard_(0)
+    , samplesSinceCycleStart_(0)
+    , sampleRate_(44100.0) // default initial value
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -53,6 +56,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut)
         return;
 
+    // Read control pins and clamp
     float threshold = pinThreshold_;
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
@@ -65,10 +69,19 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
 
         // --- Detect new cycle on positive zero-crossing ---
+        samplesSinceCycleStart_++;
+
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            previousCyclePeak = cyclePeak_;
-            cyclePeak_ = 0.0f;
+            // guard against short half-cycles
+            if (samplesSinceCycleStart_ >= minCycleGuard_)
+            {
+                previousCyclePeak = cyclePeak_;
+                cyclePeak_ = 0.0f;
+                lastPositiveWidth_ = samplesSinceCycleStart_;
+                minCycleGuard_ = lastPositiveWidth_ / 4; // quarter length
+                samplesSinceCycleStart_ = 0;
+            }
         }
 
 #ifdef FULL_WAVE_PEAK
@@ -76,6 +89,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 #else
         float valueForPeak = x;
 #endif
+
         if (valueForPeak > cyclePeak_)
             cyclePeak_ = valueForPeak;
 
@@ -85,26 +99,24 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         lookaheadBuffer_[bufferWritePos_] = x;
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
-        bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
 
         // --- CV output ---
-        float currentPeak = std::max(cyclePeak_, previousCyclePeak);
-        float overValue = 0.0f;
-        if (currentPeak > threshold)
-        {
-            float over = currentPeak - threshold;
-            overValue = over * (1.0f - 1.0f / ratio);
-        }
+        float currentPeak = previousCyclePeak; // delayed per-cycle peak
 
-        float cvValue = 10.0f - overValue;
+        float over = currentPeak - threshold;
+        if (over < 0.0f) over = 0.0f;
+        float compressed = over / ratio;
+        float cvValue = 10.0f - compressed * 10.0f; // scale to 0-10V
         if (cvValue < 0.0f) cvValue = 0.0f;
         if (cvValue > 10.0f) cvValue = 10.0f;
 
         cvOut[s] = cvValue;
+
+        bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
 }
 
-// Register plugin
+// Register plugin with SE
 namespace
 {
     auto r = Register<CyclePeakLookahead>::withId(L"CyclePeakLookahead_SE");

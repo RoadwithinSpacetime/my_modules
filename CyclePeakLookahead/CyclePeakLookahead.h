@@ -18,17 +18,19 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;         // CV output based on threshold and ratio
-    FloatInPin pinThreshold_; // Threshold in volts
-    FloatInPin pinRatio_;     // Ratio (1:1..20:1)
+    AudioOutPin pinCV_;       // control voltage output
+    FloatInPin  pinThreshold_; // threshold in volts
+    FloatInPin  pinRatio_;     // compression ratio (1:1 .. 20:1)
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
     int bufferWritePos_;
     int lookaheadSamples_; // 30 ms in samples
 
-    // Per-cycle peak tracking
+    // Peak tracking aligned with delayed audio
     std::vector<float> peakHoldBuffer_;
+
+    // Cycle tracking
     float lastSample_;
     float cyclePeak_;
     int samplesSinceCycleStart_;
