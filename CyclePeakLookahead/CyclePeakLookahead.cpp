@@ -1,8 +1,7 @@
 #include "CyclePeakLookahead.h"
 
 #undef max
-#undef min  // protect against Windows macros
-
+#undef min
 #define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
@@ -13,11 +12,13 @@ CyclePeakLookahead::CyclePeakLookahead()
     , samplesSinceCycleStart_(0)
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
-    , sampleRate_(0.0)  // default sample rate
+    , sampleRate_(0.0) // default before open()
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
-    initializePin(pinPeak_);
+    initializePin(pinGate_);
+    initializePin(pinThreshold_);
+    initializePin(pinRatio_);
 }
 
 int32_t CyclePeakLookahead::open()
@@ -26,9 +27,6 @@ int32_t CyclePeakLookahead::open()
 
     lastSample_ = 0.0f;
     cyclePeak_ = 0.0f;
-    samplesSinceCycleStart_ = 0;
-    lastPositiveWidth_ = 0;
-    minCycleGuard_ = 0;
 
     // 30 ms lookahead buffer
     lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
@@ -38,7 +36,7 @@ int32_t CyclePeakLookahead::open()
 
     setSubProcess(&CyclePeakLookahead::subProcess);
     pinOut_.setStreaming(true);
-    pinPeak_.setStreaming(true);
+    pinGate_.setStreaming(true);
 
     return MpBase2::open();
 }
@@ -46,7 +44,7 @@ int32_t CyclePeakLookahead::open()
 void CyclePeakLookahead::onSetPins()
 {
     pinOut_.setStreaming(true);
-    pinPeak_.setStreaming(true);
+    pinGate_.setStreaming(true);
     setSubProcess(&CyclePeakLookahead::subProcess);
 }
 
@@ -54,37 +52,35 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 {
     float* in = getBuffer(pinIn_);
     float* out = getBuffer(pinOut_);
-    float* peakOut = getBuffer(pinPeak_);
+    float* gateOut = getBuffer(pinGate_);
 
-    if (!in || !out || !peakOut)
+    if (!in || !out || !gateOut)
         return;
+
+    // read inputs
+    float threshold = pinThreshold_;
+    float ratio = pinRatio_;
+
+    // clamp ratio
+    if (ratio < 1.0f) ratio = 1.0f;
+    if (ratio > 20.0f) ratio = 20.0f;
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
 
-        // --- Detect new cycle on positive zero-crossing ---
-        if (lastSample_ <= 0.0f && x > 0.0f)
+        // --- detect new cycle on positive zero-crossing ---
+        if (lastSample_ <= 0.0f && x > 0.0f && samplesSinceCycleStart_ > minCycleGuard_)
         {
-            // Only accept if enough samples passed since last cycle
-            if (samplesSinceCycleStart_ >= minCycleGuard_)
-            {
-                // Cycle ended: schedule previous cycle peak for the entire delayed cycle
-                int startPos = (bufferWritePos_ + lookaheadSamples_ - samplesSinceCycleStart_) % lookaheadSamples_;
-                for (int i = 0; i < samplesSinceCycleStart_; ++i)
-                {
-                    int pos = (startPos + i) % lookaheadSamples_;
-                    peakHoldBuffer_[pos] = cyclePeak_;
-                }
+            // schedule peak for this cycle
+            int writeIndex = (bufferWritePos_ + lookaheadSamples_ - samplesSinceCycleStart_) % lookaheadSamples_;
+            peakHoldBuffer_[writeIndex] = cyclePeak_;
 
-                // Update adaptive guard
-                lastPositiveWidth_ = samplesSinceCycleStart_;
-                minCycleGuard_ = lastPositiveWidth_ / 4;
-
-                // Reset for new cycle
-                cyclePeak_ = 0.0f;
-                samplesSinceCycleStart_ = 0;
-            }
+            // prepare next cycle
+            lastPositiveWidth_ = samplesSinceCycleStart_;
+            minCycleGuard_ = std::max(1, lastPositiveWidth_ / 4);
+            samplesSinceCycleStart_ = 0;
+            cyclePeak_ = 0.0f;
         }
 
 #ifdef FULL_WAVE_PEAK
@@ -92,23 +88,32 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 #else
         float valueForPeak = x;
 #endif
-
-        // Update current cycle peak
         if (valueForPeak > cyclePeak_)
             cyclePeak_ = valueForPeak;
 
         lastSample_ = x;
-        samplesSinceCycleStart_++;
+        ++samplesSinceCycleStart_;
 
-        // --- Write to lookahead buffer ---
+        // --- write to lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
 
-        // --- Output delayed audio and peak ---
+        // --- read delayed audio and peak ---
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
-        peakOut[s] = peakHoldBuffer_[readPos];
+        float currentPeak = peakHoldBuffer_[readPos];
 
-        // --- Increment buffer write position ---
+        // --- compressor-like CV output ---
+        float cvOut = 10.0f; // base at threshold
+        if (currentPeak > threshold)
+        {
+            float over = currentPeak - threshold;
+            float reduction = over * (1.0f - 1.0f / ratio); // compressor law
+            cvOut = 10.0f - reduction;
+            if (cvOut < 0.0f) cvOut = 0.0f;
+        }
+        gateOut[s] = cvOut;
+
+        // --- increment buffer write position ---
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
 }
