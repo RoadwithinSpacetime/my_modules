@@ -22,17 +22,20 @@ private:
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
-    int   bufferWritePos_;
-    int   lookaheadSamples_; // 30 ms in samples
+    int bufferWritePos_;
+    int lookaheadSamples_; // 30 ms in samples
 
-    // Scheduled per-cycle peak (aligned with delayed audio)
+    // Per-cycle peak hold buffer (aligned to delayed audio)
     std::vector<float> peakHoldBuffer_;
 
     // Cycle tracking
-    float  lastSample_;
-    float  cyclePeak_;           // max of current cycle
-    float  previousCyclePeak_;   // peak of previous cycle
-    int    samplesSinceCycleStart_; // samples since last zero-crossing
+    float lastSample_;
+    float cyclePeak_;
+    int samplesSinceCycleStart_;
+
+    // Adaptive zero-crossing guard
+    int lastPositiveWidth_; // length of previous positive half-cycle
+    int minCycleGuard_;     // quarter of that length
 
     // Misc
     double sampleRate_;

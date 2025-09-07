@@ -3,7 +3,6 @@
 #undef max
 #undef min  // protect against Windows macros
 
-// Uncomment to enable full-wave peak detection
 #define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
@@ -12,6 +11,8 @@ CyclePeakLookahead::CyclePeakLookahead()
     , bufferWritePos_(0)
     , lookaheadSamples_(0)
     , samplesSinceCycleStart_(0)
+    , lastPositiveWidth_(0)
+    , minCycleGuard_(0)
     , sampleRate_(0.0)  // default sample rate
 {
     initializePin(pinIn_);
@@ -26,6 +27,8 @@ int32_t CyclePeakLookahead::open()
     lastSample_ = 0.0f;
     cyclePeak_ = 0.0f;
     samplesSinceCycleStart_ = 0;
+    lastPositiveWidth_ = 0;
+    minCycleGuard_ = 0;
 
     // 30 ms lookahead buffer
     lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
@@ -63,17 +66,25 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         // --- Detect new cycle on positive zero-crossing ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            // Cycle ended: schedule previous cycle peak for the entire delayed cycle
-            int startPos = (bufferWritePos_ + lookaheadSamples_ - samplesSinceCycleStart_) % lookaheadSamples_;
-            for (int i = 0; i < samplesSinceCycleStart_; ++i)
+            // Only accept if enough samples passed since last cycle
+            if (samplesSinceCycleStart_ >= minCycleGuard_)
             {
-                int pos = (startPos + i) % lookaheadSamples_;
-                peakHoldBuffer_[pos] = cyclePeak_;
-            }
+                // Cycle ended: schedule previous cycle peak for the entire delayed cycle
+                int startPos = (bufferWritePos_ + lookaheadSamples_ - samplesSinceCycleStart_) % lookaheadSamples_;
+                for (int i = 0; i < samplesSinceCycleStart_; ++i)
+                {
+                    int pos = (startPos + i) % lookaheadSamples_;
+                    peakHoldBuffer_[pos] = cyclePeak_;
+                }
 
-            // Reset for new cycle
-            cyclePeak_ = 0.0f;
-            samplesSinceCycleStart_ = 0;
+                // Update adaptive guard
+                lastPositiveWidth_ = samplesSinceCycleStart_;
+                minCycleGuard_ = lastPositiveWidth_ / 4;
+
+                // Reset for new cycle
+                cyclePeak_ = 0.0f;
+                samplesSinceCycleStart_ = 0;
+            }
         }
 
 #ifdef FULL_WAVE_PEAK
