@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="CyclePeakLookahead_SE" name="CyclePeakLookahead" category="RwS Modules">
-		<Description>Cycle peak detection with lookahead, CV output based on threshold and ratio</Description>
+		<Description>Cycle peak detection with 30ms lookahead and CV output (0-10V)</Description>
 
 		<Audio>
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>

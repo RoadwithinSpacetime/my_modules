@@ -18,9 +18,9 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;       // control voltage output
-    FloatInPin  pinThreshold_; // threshold in volts
-    FloatInPin  pinRatio_;     // compression ratio (1:1 .. 20:1)
+    AudioOutPin pinCV_;        // control voltage output (0..10 V)
+    FloatInPin  pinThreshold_; // threshold in volts (0..10)
+    FloatInPin  pinRatio_;     // compression ratio (1..20)
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
