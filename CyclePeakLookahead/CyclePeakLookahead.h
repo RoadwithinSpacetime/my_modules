@@ -19,7 +19,7 @@ private:
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
     AudioOutPin pinCV_;        // control voltage output (0..10 V)
-    FloatInPin  pinThreshold_; // threshold in volts (0..10)
+    FloatInPin  pinThreshold_; // threshold in volts
     FloatInPin  pinRatio_;     // compression ratio (1..20)
 
     // Lookahead audio delay

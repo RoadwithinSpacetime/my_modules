@@ -13,7 +13,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
     , samplesSinceCycleStart_(0)
-    , sampleRate_(0.0) // default initial value
+    , sampleRate_(44100.0) // default initial value
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -56,15 +56,13 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut)
         return;
 
-    // Read control pins and clamp
+    // Read control pins
     float threshold = pinThreshold_;
     float ratio = pinRatio_;
     if (threshold < 0.0f) threshold = 0.0f;
     if (threshold > 10.0f) threshold = 10.0f;
     if (ratio < 1.0f) ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
-
-    const float maxVolt = 10.0f; // expected maximum peak voltage
 
     static float previousCyclePeak = 0.0f;
 
@@ -77,13 +75,12 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            // guard against spurious zero-crossings
             if (samplesSinceCycleStart_ >= minCycleGuard_)
             {
                 previousCyclePeak = cyclePeak_;
                 cyclePeak_ = 0.0f;
                 lastPositiveWidth_ = samplesSinceCycleStart_;
-                minCycleGuard_ = lastPositiveWidth_ / 4; // quarter-cycle guard
+                minCycleGuard_ = lastPositiveWidth_ / 4; // guard
                 samplesSinceCycleStart_ = 0;
             }
         }
@@ -104,17 +101,14 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // --- CV output (0..10 V) ---
-        float currentPeak = previousCyclePeak; // delayed per-cycle peak
-
-        float over = (currentPeak - threshold) / (maxVolt - threshold);
+        // --- CV output using your formula ---
+        float currentPeak = previousCyclePeak;
+        float over = currentPeak - threshold;
         if (over < 0.0f) over = 0.0f;
-        if (over > 1.0f) over = 1.0f;
 
-        float compressed = over / ratio;
-        if (compressed > 1.0f) compressed = 1.0f;
+        float cvValue = 10.0f - over - (over / ratio);
 
-        float cvValue = 10.0f - compressed * 10.0f;
+        // Clamp to 0–10 V
         if (cvValue < 0.0f) cvValue = 0.0f;
         if (cvValue > 10.0f) cvValue = 10.0f;
 
