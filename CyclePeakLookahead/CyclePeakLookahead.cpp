@@ -64,7 +64,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         return;
 
     // Read controls
-    float threshold = pinThreshold_ * 10.0f; // map 0–1 -> 0–10 V
+    float threshold = pinThreshold_ * 1.0f; // map 0–1 -> 0–10 V
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
@@ -110,7 +110,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float over = previousCyclePeak_ - threshold;
         if (over < 0.0f) over = 0.0f;
 
-        float cvValue = 10.0f - over - (over / ratio);
+        float cvValue = 10.0f - (over + (over / ratio));
 
         if (cvValue < 0.0f) cvValue = 0.0f;
         if (cvValue > 10.0f) cvValue = 10.0f;
