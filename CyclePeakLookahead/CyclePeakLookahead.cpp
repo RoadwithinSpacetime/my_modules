@@ -110,7 +110,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float over = previousCyclePeak_ - threshold;
         if (over < 0.0f) over = 0.0f;
 
-        float cvValue = over;
+        float cvValue = 10 - over + over/ratio;
 
         if (cvValue < 0.0f) cvValue = 0.0f;
         if (cvValue > 10.0f) cvValue = 10.0f;
