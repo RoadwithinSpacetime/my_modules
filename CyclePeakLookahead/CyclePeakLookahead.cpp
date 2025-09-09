@@ -13,7 +13,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     , samplesSinceCycleStart_(0)
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
-    , sampleRate_(44100.0)
+    , sampleRate_(0.0)
     , previousCyclePeak_(0.0f)
 {
     initializePin(pinIn_);
@@ -110,7 +110,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float over = previousCyclePeak_ - threshold;
         if (over < 0.0f) over = 0.0f;
 
-        float cvValue = 10.0f - (over + (over / ratio));
+        float cvValue = 10.0f - (over);
 
         if (cvValue < 0.0f) cvValue = 0.0f;
         if (cvValue > 10.0f) cvValue = 10.0f;
