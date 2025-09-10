@@ -18,7 +18,7 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;      // Control Voltage out (0–10 V)
+    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
     FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
     FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
 
@@ -33,6 +33,7 @@ private:
     // Cycle tracking
     float lastSample_;
     float cyclePeak_;
+    float previousCyclePeak_;
     int samplesSinceCycleStart_;
 
     // Adaptive zero-crossing guard
@@ -41,5 +42,10 @@ private:
 
     // Misc
     double sampleRate_;
-    float previousCyclePeak_;
+    
+    // CV smoothing (needed for noise reduction)
+    float cvStart_;     // CV value at start of current cycle
+    float cvTarget_;    // CV target at end of current cycle
+    int cycleLength_;   // length of this cycle in samples
+    int cyclePos_;      // current position in the cycle
 };
