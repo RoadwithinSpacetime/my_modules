@@ -100,15 +100,15 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                     float compressedPeak = threshold + over / ratio;
 
                     // Normalize to input peak, scale to 0–10 V
-                    cvTarget_ = 10.0f * (compressedPeak / previousCyclePeak_);
+                    cvTarget_ = 1.0f * (compressedPeak / previousCyclePeak_);
                 }
                 else
                 {
-                    cvTarget_ = 10.0f; // idle = max CV
+                    cvTarget_ = 1.0f; // idle = max CV
                 }
 
                 if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
-                if (cvTarget_ > 10.0f) cvTarget_ = 10.0f;
+                if (cvTarget_ > 1.0f) cvTarget_ = 1.0f;
 
                 cycleLength_ = samplesSinceCycleStart_;
                 cyclePos_ = 0;
@@ -139,7 +139,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float cvValue = cvStart_ + (cvTarget_ - cvStart_) * t;
 
         if (cvValue < 0.0f) cvValue = 0.0f;
-        if (cvValue > 10.0f) cvValue = 10.0f;
+        if (cvValue > 1.0f) cvValue = 1.0f;
 
         cvOut[s] = cvValue;
         cyclePos_++;
