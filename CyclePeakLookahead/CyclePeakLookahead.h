@@ -14,38 +14,38 @@ public:
     void onSetPins() override;
     void subProcess(int sampleFrames);
 
+    // Add this line if you want CPU-saving silent mode:
+    void subProcessSilent(int sampleFrames);
+
 private:
-    // Pins
+    //=== Pins ===
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
-    FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
-    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
+    AudioOutPin pinCV_;
+    FloatInPin  pinThreshold_;
+    FloatInPin  pinRatio_;
 
-    // Lookahead audio delay
+    //=== Lookahead audio delay ===
     std::vector<float> lookaheadBuffer_;
-    int bufferWritePos_;
-    int lookaheadSamples_; // 30 ms in samples
+    int bufferWritePos_ = 0;
+    int lookaheadSamples_ = 0;
 
-    // Per-cycle peak hold buffer (aligned to delayed audio)
-    std::vector<float> peakHoldBuffer_;
+    //=== Per-cycle peak detection ===
+    float lastSample_ = 0.0f;
+    float cyclePeak_ = 0.0f;
+    float previousCyclePeak_ = 0.0f;
+    int samplesSinceCycleStart_ = 0;
 
-    // Cycle tracking
-    float lastSample_;
-    float cyclePeak_;
-    float previousCyclePeak_;
-    int samplesSinceCycleStart_;
+    //=== Adaptive zero-crossing guard ===
+    int lastPositiveWidth_ = 0;
+    int minCycleGuard_ = 0;
 
-    // Adaptive zero-crossing guard
-    int lastPositiveWidth_; // length of previous positive half-cycle
-    int minCycleGuard_;     // quarter of that length
+    //=== Misc ===
+    double sampleRate_ = 0.0;
 
-    // Misc
-    double sampleRate_;
-    
-    // CV smoothing (needed for noise reduction)
-    float cvStart_;     // CV value at start of current cycle
-    float cvTarget_;    // CV target at end of current cycle
-    int cycleLength_;   // length of this cycle in samples
-    int cyclePos_;      // current position in the cycle
+    //=== CV smoothing ===
+    float cvStart_ = 1.0f;
+    float cvTarget_ = 1.0f;
+    int cycleLength_ = 1;
+    int cyclePos_ = 0;
 };

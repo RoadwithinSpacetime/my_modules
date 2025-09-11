@@ -4,11 +4,14 @@
 		<Description>Cycle peak detection with CV output (0–10 V compressor-style)</Description>
 
 		<Audio>
+			<!-- Audio pins -->
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
 			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
 			<Pin name="CV" datatype="float" direction="out" rate="audio"/>
-			<Pin name="Threshold" datatype="float" direction="in" rate="control" default="0.5" />
-			<Pin name="Ratio" datatype="float" direction="in" rate="control" default="1.0" />
+
+			<!-- Control pins -->
+			<Pin name="Threshold" datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Ratio" datatype="float" direction="in" rate="control" default="1.0"/>
 		</Audio>
 
 		<Vendor>Road_within_Spacetime</Vendor>
