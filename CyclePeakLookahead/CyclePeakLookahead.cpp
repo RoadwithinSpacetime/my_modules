@@ -33,10 +33,10 @@ int32_t CyclePeakLookahead::open()
 
     lastSample_ = 0.0f;
     cyclePeak_ = 0.0f;
+    previousCyclePeak_ = 0.0f;
     samplesSinceCycleStart_ = 0;
     lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
-    previousCyclePeak_ = 0.0f;
 
     // 30 ms lookahead buffer
     lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
@@ -91,20 +91,25 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
                 // Setup interpolation for the new cycle
                 cvStart_ = cvTarget_;
-                float over = previousCyclePeak_ - threshold;
-                if (over < 0.0f) over = 0.0f;
 
-                float nextCv = 10.0f; // default at/below threshold
                 if (previousCyclePeak_ > 0.0f)
                 {
-                    // compressor-like formula
-                    nextCv = 10.0f - (over - (over / ratio));
+                    float over = previousCyclePeak_ - threshold;
+                    if (over < 0.0f) over = 0.0f;
+
+                    float compressedPeak = threshold + over / ratio;
+
+                    // Normalize to input peak, scale to 0–10 V
+                    cvTarget_ = 10.0f * (compressedPeak / previousCyclePeak_);
+                }
+                else
+                {
+                    cvTarget_ = 10.0f; // idle = max CV
                 }
 
-                if (nextCv < 0.0f) nextCv = 0.0f;
-                if (nextCv > 10.0f) nextCv = 10.0f;
+                if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
+                if (cvTarget_ > 10.0f) cvTarget_ = 10.0f;
 
-                cvTarget_ = nextCv;
                 cycleLength_ = samplesSinceCycleStart_;
                 cyclePos_ = 0;
 
