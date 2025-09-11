@@ -43,7 +43,7 @@ int32_t CyclePeakLookahead::open()
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
-    // Start silent until input is streaming
+    // Start in silent mode until audio streams
     setSubProcess(&CyclePeakLookahead::subProcessSilent);
     pinOut_.setStreaming(false);
     pinCV_.setStreaming(false);
@@ -71,7 +71,6 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
 {
     float* in = getBuffer(pinIn_);
 
-    // If audio arrives again -> wake up
     if (in && pinIn_.isStreaming())
     {
         setSubProcess(&CyclePeakLookahead::subProcess);
@@ -83,7 +82,7 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
         return;
     }
 
-    // Output silence while idle
+    // Output silence
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
     if (out) memset(out, 0, sampleFrames * sizeof(float));
@@ -110,7 +109,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Detect new cycle on positive zero-crossing (with guard) ---
+        // --- Detect new cycle on positive zero-crossing (with minCycleGuard) ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -118,11 +117,9 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 lastPositiveWidth_ = samplesSinceCycleStart_;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
 
-                // Commit peak of last cycle
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                // Setup interpolation for the new cycle
                 cvStart_ = cvTarget_;
 
                 if (previousCyclePeak_ > 0.0f)
@@ -131,8 +128,6 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                     if (over < 0.0f) over = 0.0f;
 
                     float compressedPeak = threshold + over / ratio;
-
-                    // Normalize to input peak, scale 0–1 (later mapped to 0–10V in SE)
                     cvTarget_ = compressedPeak / previousCyclePeak_;
                 }
                 else
@@ -145,7 +140,6 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
                 cycleLength_ = samplesSinceCycleStart_;
                 cyclePos_ = 0;
-
                 samplesSinceCycleStart_ = 0;
             }
         }
@@ -174,10 +168,9 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         if (cvValue < 0.0f) cvValue = 0.0f;
         if (cvValue > 1.0f) cvValue = 1.0f;
 
-        cvOut[s] = cvValue; // normalized 0..1, map in SE to 0–10V if needed
+        cvOut[s] = cvValue; // normalized 0..1
         cyclePos_++;
 
-        // --- Increment buffer write position ---
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
 }
