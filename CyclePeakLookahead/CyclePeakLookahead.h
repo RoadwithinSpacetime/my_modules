@@ -41,9 +41,6 @@ private:
     // Misc
     double sampleRate_;
 
-    // CV smoothing (for zero-cross aligned CV)
-    float cvStart_;
-    float cvTarget_;
-    int cycleLength_;
-    int cyclePos_;
+    // CV output per cycle
+    float cvTarget_; // stair-step value, updated at zero-crossing
 };

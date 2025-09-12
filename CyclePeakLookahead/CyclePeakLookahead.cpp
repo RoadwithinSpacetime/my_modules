@@ -15,10 +15,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
     , sampleRate_(0.0)
-    , cvStart_(1.0f)
     , cvTarget_(1.0f)
-    , cycleLength_(1)
-    , cyclePos_(0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -43,7 +40,7 @@ int32_t CyclePeakLookahead::open()
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
-    // Start in silent mode until audio streams
+    // Start silent until input is streaming
     setSubProcess(&CyclePeakLookahead::subProcessSilent);
     pinOut_.setStreaming(false);
     pinCV_.setStreaming(false);
@@ -76,13 +73,10 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
         setSubProcess(&CyclePeakLookahead::subProcess);
         pinOut_.setStreaming(true);
         pinCV_.setStreaming(true);
-
-        // Immediately process current block
         subProcess(sampleFrames);
         return;
     }
 
-    // Output silence
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
     if (out) memset(out, 0, sampleFrames * sizeof(float));
@@ -98,7 +92,6 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut)
         return;
 
-    // Read controls
     float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10 V
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
@@ -109,7 +102,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Detect new cycle on positive zero-crossing (with minCycleGuard) ---
+        // --- Detect positive zero-crossing with guard ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -120,26 +113,23 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                cvStart_ = cvTarget_;
-
+                // --- Compute new stair-step CV ---
                 if (previousCyclePeak_ > 0.0f)
                 {
                     float over = previousCyclePeak_ - threshold;
                     if (over < 0.0f) over = 0.0f;
-
                     float compressedPeak = threshold + over / ratio;
+
+                    // Normalize to input peak, CV in 0..1
                     cvTarget_ = compressedPeak / previousCyclePeak_;
+                    if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
+                    if (cvTarget_ > 1.0f) cvTarget_ = 1.0f;
                 }
                 else
                 {
-                    cvTarget_ = 1.0f; // idle = max CV
+                    cvTarget_ = 1.0f;
                 }
 
-                if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
-                if (cvTarget_ > 1.0f) cvTarget_ = 1.0f;
-
-                cycleLength_ = samplesSinceCycleStart_;
-                cyclePos_ = 0;
                 samplesSinceCycleStart_ = 0;
             }
         }
@@ -154,22 +144,13 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Write to lookahead buffer ---
+        // --- Lookahead buffer for delayed audio ---
         lookaheadBuffer_[bufferWritePos_] = x;
-
-        // --- Read delayed sample ---
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // --- Interpolated CV output ---
-        float t = (cycleLength_ > 0) ? (float)cyclePos_ / (float)cycleLength_ : 1.0f;
-        float cvValue = cvStart_ + (cvTarget_ - cvStart_) * t;
-
-        if (cvValue < 0.0f) cvValue = 0.0f;
-        if (cvValue > 1.0f) cvValue = 1.0f;
-
-        cvOut[s] = cvValue; // normalized 0..1
-        cyclePos_++;
+        // --- CV stair-step output ---
+        cvOut[s] = cvTarget_;
 
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
