@@ -35,12 +35,12 @@ private:
     int samplesSinceCycleStart_;
 
     // Adaptive zero-crossing guard
-    int lastPositiveWidth_;
-    int minCycleGuard_;
-
-    // CV sample-and-hold
-    float cvTarget_; // new CV to apply at next valid zero-crossing
+    int lastPositiveWidth_; // length of previous positive half-cycle
+    int minCycleGuard_;     // quarter of that length
 
     // Misc
     double sampleRate_;
+
+    // CV output per cycle
+    float cvTarget_; // stair-step value, updated at zero-crossing
 };
