@@ -32,7 +32,9 @@ int32_t CyclePeakLookahead::open()
     cyclePeak_ = 0.0f;
     previousCyclePeak_ = 0.0f;
     samplesSinceCycleStart_ = 0;
-    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10ms
+
+    // Adaptive guard
+    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
     // 30 ms lookahead buffer
@@ -40,7 +42,7 @@ int32_t CyclePeakLookahead::open()
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
-    // Start silent until input is streaming
+    // Start in idle mode
     setSubProcess(&CyclePeakLookahead::subProcessSilent);
     pinOut_.setStreaming(false);
     pinCV_.setStreaming(false);
@@ -64,19 +66,23 @@ void CyclePeakLookahead::onSetPins()
     }
 }
 
+// Idle while input is silent
 void CyclePeakLookahead::subProcessSilent(int sampleFrames)
 {
     float* in = getBuffer(pinIn_);
 
+    // Wake up if audio appears
     if (in && pinIn_.isStreaming())
     {
         setSubProcess(&CyclePeakLookahead::subProcess);
         pinOut_.setStreaming(true);
         pinCV_.setStreaming(true);
+
         subProcess(sampleFrames);
         return;
     }
 
+    // Output silence
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
     if (out) memset(out, 0, sampleFrames * sizeof(float));
@@ -92,20 +98,26 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut)
         return;
 
-    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10 V
+    // Controls
+    float threshold = pinThreshold_ * 10.0f; // 0–1 naar 0–10 V
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
+
+    // Frequency limits in samples
+    int minSamples = static_cast<int>(sampleRate_ / 6000.0); // 6 kHz
+    int maxSamples = static_cast<int>(sampleRate_ / 30.0);   // 30 Hz
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Detect positive zero-crossing with guard ---
+        // Detect positive zero-crossing
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            if (samplesSinceCycleStart_ > minCycleGuard_)
+            // Only valid cycles
+            if (samplesSinceCycleStart_ >= minSamples && samplesSinceCycleStart_ <= maxSamples)
             {
                 lastPositiveWidth_ = samplesSinceCycleStart_;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
@@ -113,15 +125,14 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                // --- Compute new stair-step CV ---
+                // Compute CV for next cycle (sample-and-hold)
                 if (previousCyclePeak_ > 0.0f)
                 {
                     float over = previousCyclePeak_ - threshold;
                     if (over < 0.0f) over = 0.0f;
-                    float compressedPeak = threshold + over / ratio;
 
-                    // Normalize to input peak, CV in 0..1
-                    cvTarget_ = compressedPeak / previousCyclePeak_;
+                    float compressedPeak = threshold + over / ratio;
+                    cvTarget_ = compressedPeak / previousCyclePeak_; // normalized 0..1
                     if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
                     if (cvTarget_ > 1.0f) cvTarget_ = 1.0f;
                 }
@@ -144,13 +155,14 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Lookahead buffer for delayed audio ---
+        // --- Write to lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
+
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // --- CV stair-step output ---
-        cvOut[s] = cvTarget_;
+        // --- Sample-and-hold CV ---
+        cvOut[s] = cvTarget_; // constant within the cycle
 
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
