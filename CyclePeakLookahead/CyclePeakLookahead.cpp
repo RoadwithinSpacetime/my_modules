@@ -32,8 +32,6 @@ int32_t CyclePeakLookahead::open()
     cyclePeak_ = 0.0f;
     previousCyclePeak_ = 0.0f;
     samplesSinceCycleStart_ = 0;
-
-    // Adaptive guard
     lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
@@ -42,7 +40,7 @@ int32_t CyclePeakLookahead::open()
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
-    // Start in idle mode
+    // start silent until input streams
     setSubProcess(&CyclePeakLookahead::subProcessSilent);
     pinOut_.setStreaming(false);
     pinCV_.setStreaming(false);
@@ -66,12 +64,11 @@ void CyclePeakLookahead::onSetPins()
     }
 }
 
-// Idle while input is silent
 void CyclePeakLookahead::subProcessSilent(int sampleFrames)
 {
     float* in = getBuffer(pinIn_);
 
-    // Wake up if audio appears
+    // If audio arrives again -> wake up
     if (in && pinIn_.isStreaming())
     {
         setSubProcess(&CyclePeakLookahead::subProcess);
@@ -82,10 +79,10 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
         return;
     }
 
-    // Output silence
+    // Output silence while idle
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
-    if (out) memset(out, 0, sampleFrames * sizeof(float));
+    if (out)   memset(out, 0, sampleFrames * sizeof(float));
     if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
 }
 
@@ -94,54 +91,64 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float* in = getBuffer(pinIn_);
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
-
     if (!in || !out || !cvOut)
         return;
 
-    // Controls
-    float threshold = pinThreshold_ * 0.1f; // needs to be 0.1f
+    // Read controls
+    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10 V
     float ratio = pinRatio_;
-    if (ratio < 1.0f) ratio = 1.0f;
+    if (ratio < 1.0f)  ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
 
-    // Frequency limits in samples
-    int minSamples = static_cast<int>(sampleRate_ / 6000.0); // 6 kHz
-    int maxSamples = static_cast<int>(sampleRate_ / 30.0);   // 30 Hz
+    // Frequency guard thresholds (30 Hz – 6 kHz)
+    const int minSamples = static_cast<int>(sampleRate_ / 6000.0); // shortest half-cycle allowed
+    const int maxSamples = static_cast<int>(sampleRate_ / 30.0);   // longest half-cycle allowed
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // Detect positive zero-crossing
+        // --- Detect new cycle on positive zero-crossing ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
-            // Only valid cycles
-            if (samplesSinceCycleStart_ >= minSamples && samplesSinceCycleStart_ <= maxSamples)
+            // Minimum guard to avoid false triggers
+            if (samplesSinceCycleStart_ > minCycleGuard_)
             {
-                lastPositiveWidth_ = samplesSinceCycleStart_;
-                minCycleGuard_ = lastPositiveWidth_ / 4;
+                int cycleLength = samplesSinceCycleStart_;
+                samplesSinceCycleStart_ = 0;
 
-                previousCyclePeak_ = cyclePeak_;
-                cyclePeak_ = 0.0f;
-
-                // Compute CV for next cycle (sample-and-hold)
-                if (previousCyclePeak_ > 0.0f)
+                // Enforce 30 Hz–6 kHz range
+                if (cycleLength >= minSamples && cycleLength <= maxSamples)
                 {
-                    float over = previousCyclePeak_ - threshold;
-                    if (over < 0.0f) over = 0.0f;
+                    lastPositiveWidth_ = cycleLength;
+                    minCycleGuard_ = lastPositiveWidth_ / 4;
 
-                    float compressedPeak = threshold + over / ratio;
-                    cvTarget_ = compressedPeak / previousCyclePeak_; // normalized 0..1
+                    // Commit peak of last valid cycle
+                    previousCyclePeak_ = cyclePeak_;
+                    cyclePeak_ = 0.0f;
+
+                    if (previousCyclePeak_ > 0.0f)
+                    {
+                        float over = previousCyclePeak_ - threshold;
+                        if (over < 0.0f) over = 0.0f;
+
+                        float compressedPeak = threshold + over / ratio;
+                        cvTarget_ = compressedPeak / previousCyclePeak_;
+                    }
+                    else
+                    {
+                        cvTarget_ = 1.0f;
+                    }
+
                     if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
                     if (cvTarget_ > 1.0f) cvTarget_ = 1.0f;
                 }
                 else
                 {
-                    cvTarget_ = 1.0f;
+                    // Out-of-band cycle -> hold previous CV and reset peak
+                    cyclePeak_ = 0.0f;
                 }
-
-                samplesSinceCycleStart_ = 0;
             }
         }
 
@@ -155,14 +162,13 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Write to lookahead buffer ---
+        // --- Lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
-
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // --- Sample-and-hold CV ---
-        cvOut[s] = cvTarget_; // constant within the cycle
+        // --- CV output (sample-and-hold) ---
+        cvOut[s] = cvTarget_;
 
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
