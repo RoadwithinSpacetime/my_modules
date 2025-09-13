@@ -25,7 +25,6 @@ private:
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
-    std::vector<float> cvDelayBuffer_;
     int bufferWritePos_;
     int lookaheadSamples_; // 30 ms in samples
 
@@ -41,4 +40,8 @@ private:
 
     // Misc
     double sampleRate_;
+
+    // CV hold / smoothing
+    float cvCurrent_;  // target CV per cycle
+    float cvFiltered_; // filtered CV output for high frequencies
 };
