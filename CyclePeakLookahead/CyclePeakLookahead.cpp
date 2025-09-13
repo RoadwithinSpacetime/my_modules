@@ -16,8 +16,6 @@ CyclePeakLookahead::CyclePeakLookahead()
     , minCycleGuard_(0)
     , sampleRate_(0.0)
     , cvTarget_(1.0f)
-    , cvSmooth_(1.0f)
-    , smoothingAlpha_(0.0f)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -37,15 +35,12 @@ int32_t CyclePeakLookahead::open()
     lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
-    // 30 ms lookahead buffer
-    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
+    // --- Lookahead buffer ---
+    // Base 30 ms plus one cycle at 4 kHz fundamental to ensure CV is ready
+    int oneCycleSamples = static_cast<int>(sampleRate_ / 4000.0); // 1 cycle of 4 kHz
+    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_) + oneCycleSamples;
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
-    cvDelayBuffer_.assign(lookaheadSamples_, 1.0f); // start with unity CV
     bufferWritePos_ = 0;
-
-    // Optional smoothing constant (0.1 ms example)
-    float smoothTime = 0.0001f;
-    smoothingAlpha_ = 1.0f - std::exp(-1.0f / (smoothTime * static_cast<float>(sampleRate_)));
 
     // Start silent until input is streaming
     setSubProcess(&CyclePeakLookahead::subProcessSilent);
@@ -99,7 +94,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut)
         return;
 
-    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10 V
+    float threshold = pinThreshold_ * 0.1f; // map 0–1 naar 0–10 V
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
@@ -151,17 +146,13 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Write to lookahead buffers ---
+        // --- Lookahead buffer for delayed audio ---
         lookaheadBuffer_[bufferWritePos_] = x;
-        cvDelayBuffer_[bufferWritePos_] = cvTarget_;
-
-        // --- Read delayed outputs ---
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // Optional tiny smoothing of CV to reduce aliasing
-        cvSmooth_ += smoothingAlpha_ * (cvDelayBuffer_[readPos] - cvSmooth_);
-        cvOut[s] = cvSmooth_;
+        // --- CV stair-step output ---
+        cvOut[s] = cvTarget_;
 
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
