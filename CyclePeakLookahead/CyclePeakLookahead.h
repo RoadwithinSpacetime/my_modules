@@ -19,13 +19,12 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;        // Control Voltage out (0–10 V normalized 0..1)
+    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
     FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
     FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
-    std::vector<float> cvBuffer_;   // CV delay line to match lookahead
     int bufferWritePos_;
     int lookaheadSamples_; // 30 ms in samples
 
@@ -33,15 +32,20 @@ private:
     float lastSample_;
     float cyclePeak_;
     float previousCyclePeak_;
-    int samplesSinceCycleStart_;
+    int   samplesSinceCycleStart_;
 
     // Adaptive zero-crossing guard
-    int lastPositiveWidth_; // length of previous positive half-cycle
-    int minCycleGuard_;     // quarter of that length
+    int   lastPositiveWidth_; // length of previous positive half-cycle
+    int   minCycleGuard_;     // quarter of that length
 
     // Misc
     double sampleRate_;
 
-    // CV output per cycle (normalized 0..1)
-    float cvTarget_; // current target value (written into cvBuffer)
+    // CV output per cycle
+    float cvTarget_;      // stair-step value, updated at zero-crossing
+
+    // ---- NEW for smoothing ----
+    float cvSmooth_;      // current smoothed CV output
+    float smoothingAlpha_; // smoothing coefficient
+    // ---------------------------
 };
