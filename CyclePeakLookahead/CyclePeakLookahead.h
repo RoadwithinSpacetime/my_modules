@@ -25,8 +25,9 @@ private:
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
+    std::vector<float> cvDelayBuffer_;
     int bufferWritePos_;
-    int lookaheadSamples_; // 30 ms + one cycle (at 4 kHz) in samples
+    int lookaheadSamples_; // 30 ms in samples
 
     // Cycle tracking
     float lastSample_;
@@ -35,12 +36,9 @@ private:
     int samplesSinceCycleStart_;
 
     // Adaptive zero-crossing guard
-    int lastPositiveWidth_; // length of previous positive half-cycle
-    int minCycleGuard_;     // quarter of that length
+    int lastPositiveWidth_;
+    int minCycleGuard_;
 
     // Misc
     double sampleRate_;
-
-    // CV output per cycle
-    float cvTarget_; // stair-step value, updated at zero-crossing
 };
