@@ -5,12 +5,6 @@
 
 #define FULL_WAVE_PEAK
 
-// ---- Quick Fix 1 for MSVC ----
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-// --------------------------------
-
 CyclePeakLookahead::CyclePeakLookahead()
     : lastSample_(0.0f)
     , cyclePeak_(0.0f)
@@ -46,14 +40,12 @@ int32_t CyclePeakLookahead::open()
     // 30 ms lookahead buffer
     lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
+    cvDelayBuffer_.assign(lookaheadSamples_, 1.0f); // start with unity CV
     bufferWritePos_ = 0;
 
-    // ---- Compute smoothing filter alpha ----
-    // target smoothing cutoff around 4 kHz fundamental
-    float fc = 4000.0f; // Hz
-    float xalpha = -2.0f * static_cast<float>(M_PI) * fc / static_cast<float>(sampleRate_);
-    smoothingAlpha_ = std::exp(xalpha);
-    // -----------------------------------------
+    // Optional smoothing constant (0.1 ms example)
+    float smoothTime = 0.0001f;
+    smoothingAlpha_ = 1.0f - std::exp(-1.0f / (smoothTime * static_cast<float>(sampleRate_)));
 
     // Start silent until input is streaming
     setSubProcess(&CyclePeakLookahead::subProcessSilent);
@@ -128,13 +120,14 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                // --- Compute new stair-step CV target ---
+                // --- Compute new stair-step CV ---
                 if (previousCyclePeak_ > 0.0f)
                 {
                     float over = previousCyclePeak_ - threshold;
                     if (over < 0.0f) over = 0.0f;
                     float compressedPeak = threshold + over / ratio;
 
+                    // Normalize to input peak, CV in 0..1
                     cvTarget_ = compressedPeak / previousCyclePeak_;
                     if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
                     if (cvTarget_ > 1.0f) cvTarget_ = 1.0f;
@@ -158,13 +151,16 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Lookahead buffer for delayed audio ---
+        // --- Write to lookahead buffers ---
         lookaheadBuffer_[bufferWritePos_] = x;
+        cvDelayBuffer_[bufferWritePos_] = cvTarget_;
+
+        // --- Read delayed outputs ---
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // --- Smoothed CV output ---
-        cvSmooth_ = cvSmooth_ + (cvTarget_ - cvSmooth_) * (1.0f - smoothingAlpha_);
+        // Optional tiny smoothing of CV to reduce aliasing
+        cvSmooth_ += smoothingAlpha_ * (cvDelayBuffer_[readPos] - cvSmooth_);
         cvOut[s] = cvSmooth_;
 
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
