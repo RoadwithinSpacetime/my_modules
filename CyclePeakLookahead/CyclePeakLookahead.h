@@ -23,7 +23,7 @@ private:
     FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
     FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
 
-    // Lookahead audio delay
+    // Lookahead buffer
     std::vector<float> lookaheadBuffer_;
     int bufferWritePos_;
     int lookaheadSamples_; // 30 ms in samples
@@ -34,14 +34,14 @@ private:
     float previousCyclePeak_;
     int samplesSinceCycleStart_;
 
-    // Adaptive zero-crossing guard
+    // Adaptive guard
     int lastPositiveWidth_;
     int minCycleGuard_;
 
     // Misc
     double sampleRate_;
 
-    // CV hold / smoothing
-    float cvCurrent_;  // target CV per cycle
-    float cvFiltered_; // filtered CV output for high frequencies
+    // CV
+    float cvCurrent_;  // applied to delayed audio (holds previous cycle’s decision)
+    float cvPending_;  // calculated from just-finished cycle
 };

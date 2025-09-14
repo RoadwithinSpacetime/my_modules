@@ -1,7 +1,7 @@
 #include "CyclePeakLookahead.h"
 
 #undef max
-#undef min // protect against Windows macros
+#undef min
 
 #define FULL_WAVE_PEAK
 
@@ -16,7 +16,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     , minCycleGuard_(0)
     , sampleRate_(0.0)
     , cvCurrent_(1.0f)
-    , cvFiltered_(1.0f)
+    , cvPending_(1.0f)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -36,12 +36,9 @@ int32_t CyclePeakLookahead::open()
     lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_);
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
-    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
+    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_); // 30 ms delay
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
-
-    cvCurrent_ = 1.0f;
-    cvFiltered_ = 1.0f;
 
     setSubProcess(&CyclePeakLookahead::subProcessSilent);
     pinOut_.setStreaming(false);
@@ -89,23 +86,20 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float* in = getBuffer(pinIn_);
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
+    if (!in || !out || !cvOut)
+        return;
 
-    if (!in || !out || !cvOut) return;
-
-    float threshold = pinThreshold_ * 0.1f;
+    float threshold = pinThreshold_ * 0.1f; // 0–1 to 0–10 V
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
-
-    // small smoothing for >4 kHz fundamental (sample period < 1/4000 = 0.25 ms)
-    float smoothingCoeff = 0.999f; // adjust to taste
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Detect positive zero-crossing with guard ---
+        // --- Positive zero-crossing with guard ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -113,24 +107,27 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 lastPositiveWidth_ = samplesSinceCycleStart_;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
 
+                // Prepare CV for NEXT cycle
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                // --- Compute new CV value for this cycle ---
                 if (previousCyclePeak_ > 0.0f)
                 {
                     float over = previousCyclePeak_ - threshold;
                     if (over < 0.0f) over = 0.0f;
                     float compressedPeak = threshold + over / ratio;
 
-                    cvCurrent_ = compressedPeak / previousCyclePeak_;
-                    if (cvCurrent_ < 0.0f) cvCurrent_ = 0.0f;
-                    if (cvCurrent_ > 1.0f) cvCurrent_ = 1.0f;
+                    cvPending_ = compressedPeak / previousCyclePeak_;
+                    if (cvPending_ < 0.0f) cvPending_ = 0.0f;
+                    if (cvPending_ > 1.0f) cvPending_ = 1.0f;
                 }
                 else
                 {
-                    cvCurrent_ = 1.0f;
+                    cvPending_ = 1.0f;
                 }
+
+                // Commit CV from previous measurement to current output
+                cvCurrent_ = cvPending_;
 
                 samplesSinceCycleStart_ = 0;
             }
@@ -146,20 +143,19 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Lookahead buffer for delayed audio ---
+        // --- Delay audio ---
         lookaheadBuffer_[bufferWritePos_] = x;
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // --- CV output with slight smoothing for high-frequency signals ---
-        cvFiltered_ = smoothingCoeff * cvFiltered_ + (1.0f - smoothingCoeff) * cvCurrent_;
-        cvOut[s] = cvFiltered_;
+        // --- Hold CV until next cycle ---
+        cvOut[s] = cvCurrent_;
 
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
 }
 
-// Register plugin with SE
+// Register plugin
 namespace
 {
     auto r = Register<CyclePeakLookahead>::withId(L"CyclePeakLookahead_SE");
