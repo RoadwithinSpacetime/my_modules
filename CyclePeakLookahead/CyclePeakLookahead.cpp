@@ -1,7 +1,7 @@
 #include "CyclePeakLookahead.h"
 
 #undef max
-#undef min
+#undef min // protect against Windows macros
 
 #define FULL_WAVE_PEAK
 
@@ -17,6 +17,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     , sampleRate_(0.0)
     , cvCurrent_(1.0f)
     , cvPending_(1.0f)
+    , compressionArmed_(false)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -33,13 +34,15 @@ int32_t CyclePeakLookahead::open()
     cyclePeak_ = 0.0f;
     previousCyclePeak_ = 0.0f;
     samplesSinceCycleStart_ = 0;
-    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_);
+    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
-    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_); // 30 ms delay
+    // 30 ms lookahead buffer
+    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
+    // Start silent until input is streaming
     setSubProcess(&CyclePeakLookahead::subProcessSilent);
     pinOut_.setStreaming(false);
     pinCV_.setStreaming(false);
@@ -66,6 +69,8 @@ void CyclePeakLookahead::onSetPins()
 void CyclePeakLookahead::subProcessSilent(int sampleFrames)
 {
     float* in = getBuffer(pinIn_);
+
+    // Wake up if audio resumes
     if (in && pinIn_.isStreaming())
     {
         setSubProcess(&CyclePeakLookahead::subProcess);
@@ -86,10 +91,11 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float* in = getBuffer(pinIn_);
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
+
     if (!in || !out || !cvOut)
         return;
 
-    float threshold = pinThreshold_ * 0.1f; // 0–1 to 0–10 V
+    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10 V
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
@@ -99,7 +105,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Positive zero-crossing with guard ---
+        // --- Detect positive zero-crossing with guard ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -107,27 +113,42 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 lastPositiveWidth_ = samplesSinceCycleStart_;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
 
-                // Prepare CV for NEXT cycle
+                // Store the cycle peak
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
+                // Calculate potential new CV
+                float newCV = 1.0f;
                 if (previousCyclePeak_ > 0.0f)
                 {
                     float over = previousCyclePeak_ - threshold;
                     if (over < 0.0f) over = 0.0f;
                     float compressedPeak = threshold + over / ratio;
+                    newCV = compressedPeak / previousCyclePeak_;
+                    if (newCV < 0.0f) newCV = 0.0f;
+                    if (newCV > 1.0f) newCV = 1.0f;
+                }
 
-                    cvPending_ = compressedPeak / previousCyclePeak_;
-                    if (cvPending_ < 0.0f) cvPending_ = 0.0f;
-                    if (cvPending_ > 1.0f) cvPending_ = 1.0f;
+                // Arm compression only after first cycle above threshold
+                if (!compressionArmed_)
+                {
+                    if (previousCyclePeak_ > threshold)
+                    {
+                        compressionArmed_ = true;
+                        cvPending_ = newCV; // Prepare but don't apply yet
+                    }
+                    else
+                    {
+                        // Hold unity until armed
+                        cvPending_ = 1.0f;
+                    }
                 }
                 else
                 {
-                    cvPending_ = 1.0f;
+                    // Normal operation: commit previous measurement
+                    cvCurrent_ = cvPending_;
+                    cvPending_ = newCV;
                 }
-
-                // Commit CV from previous measurement to current output
-                cvCurrent_ = cvPending_;
 
                 samplesSinceCycleStart_ = 0;
             }
@@ -143,19 +164,19 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Delay audio ---
+        // --- Lookahead buffer for delayed audio ---
         lookaheadBuffer_[bufferWritePos_] = x;
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // --- Hold CV until next cycle ---
+        // --- CV stair-step output ---
         cvOut[s] = cvCurrent_;
 
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
 }
 
-// Register plugin
+// Register plugin with SE
 namespace
 {
     auto r = Register<CyclePeakLookahead>::withId(L"CyclePeakLookahead_SE");
