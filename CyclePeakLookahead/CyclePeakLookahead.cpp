@@ -15,9 +15,10 @@ CyclePeakLookahead::CyclePeakLookahead()
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
     , sampleRate_(0.0)
-    , cvCurrent_(1.0f)
-    , cvPending_(1.0f)
-    , compressionArmed_(false)
+    , cvStart_(1.0f)
+    , cvTarget_(1.0f)
+    , cycleLength_(1)
+    , cyclePos_(0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -34,7 +35,7 @@ int32_t CyclePeakLookahead::open()
     cyclePeak_ = 0.0f;
     previousCyclePeak_ = 0.0f;
     samplesSinceCycleStart_ = 0;
-    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
+    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
     // 30 ms lookahead buffer
@@ -42,48 +43,18 @@ int32_t CyclePeakLookahead::open()
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
-    // Start silent until input is streaming
-    setSubProcess(&CyclePeakLookahead::subProcessSilent);
-    pinOut_.setStreaming(false);
-    pinCV_.setStreaming(false);
+    setSubProcess(&CyclePeakLookahead::subProcess);
+    pinOut_.setStreaming(true);
+    pinCV_.setStreaming(true);
 
     return MpBase2::open();
 }
 
 void CyclePeakLookahead::onSetPins()
 {
-    if (pinIn_.isStreaming())
-    {
-        setSubProcess(&CyclePeakLookahead::subProcess);
-        pinOut_.setStreaming(true);
-        pinCV_.setStreaming(true);
-    }
-    else
-    {
-        setSubProcess(&CyclePeakLookahead::subProcessSilent);
-        pinOut_.setStreaming(false);
-        pinCV_.setStreaming(false);
-    }
-}
-
-void CyclePeakLookahead::subProcessSilent(int sampleFrames)
-{
-    float* in = getBuffer(pinIn_);
-
-    // Wake up if audio resumes
-    if (in && pinIn_.isStreaming())
-    {
-        setSubProcess(&CyclePeakLookahead::subProcess);
-        pinOut_.setStreaming(true);
-        pinCV_.setStreaming(true);
-        subProcess(sampleFrames);
-        return;
-    }
-
-    float* out = getBuffer(pinOut_);
-    float* cvOut = getBuffer(pinCV_);
-    if (out) memset(out, 0, sampleFrames * sizeof(float));
-    if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
+    pinOut_.setStreaming(true);
+    pinCV_.setStreaming(true);
+    setSubProcess(&CyclePeakLookahead::subProcess);
 }
 
 void CyclePeakLookahead::subProcess(int sampleFrames)
@@ -95,6 +66,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut)
         return;
 
+    // Read controls
     float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10 V
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
@@ -105,7 +77,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Detect positive zero-crossing with guard ---
+        // --- Detect new cycle on positive zero-crossing (with guard) ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -113,42 +85,33 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 lastPositiveWidth_ = samplesSinceCycleStart_;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
 
-                // Store the cycle peak
+                // Commit peak of last cycle
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                // Calculate potential new CV
-                float newCV = 1.0f;
+                // Setup interpolation for the new cycle
+                cvStart_ = cvTarget_;
+
                 if (previousCyclePeak_ > 0.0f)
                 {
                     float over = previousCyclePeak_ - threshold;
                     if (over < 0.0f) over = 0.0f;
-                    float compressedPeak = threshold + over / ratio;
-                    newCV = compressedPeak / previousCyclePeak_;
-                    if (newCV < 0.0f) newCV = 0.0f;
-                    if (newCV > 1.0f) newCV = 1.0f;
-                }
 
-                // Arm compression only after first cycle above threshold
-                if (!compressionArmed_)
-                {
-                    if (previousCyclePeak_ > threshold)
-                    {
-                        compressionArmed_ = true;
-                        cvPending_ = newCV; // Prepare but don't apply yet
-                    }
-                    else
-                    {
-                        // Hold unity until armed
-                        cvPending_ = 1.0f;
-                    }
+                    float compressedPeak = threshold + over / ratio;
+
+                    // Normalize to input peak, scale to 0–10 V
+                    cvTarget_ = 1.0f * (compressedPeak / previousCyclePeak_);
                 }
                 else
                 {
-                    // Normal operation: commit previous measurement
-                    cvCurrent_ = cvPending_;
-                    cvPending_ = newCV;
+                    cvTarget_ = 1.0f; // idle = max CV
                 }
+
+                if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
+                if (cvTarget_ > 1.0f) cvTarget_ = 1.0f;
+
+                cycleLength_ = samplesSinceCycleStart_;
+                cyclePos_ = 0;
 
                 samplesSinceCycleStart_ = 0;
             }
@@ -164,14 +127,24 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Lookahead buffer for delayed audio ---
+        // --- Write to lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
+
+        // --- Read delayed sample ---
         int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
         out[s] = lookaheadBuffer_[readPos];
 
-        // --- CV stair-step output ---
-        cvOut[s] = cvCurrent_;
+        // --- Interpolated CV output ---
+        float t = (cycleLength_ > 0) ? (float)cyclePos_ / (float)cycleLength_ : 1.0f;
+        float cvValue = cvStart_ + (cvTarget_ - cvStart_) * t;
 
+        if (cvValue < 0.0f) cvValue = 0.0f;
+        if (cvValue > 1.0f) cvValue = 1.0f;
+
+        cvOut[s] = cvValue;
+        cyclePos_++;
+
+        // --- Increment buffer write position ---
         bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
     }
 }
