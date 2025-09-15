@@ -1,24 +1,23 @@
 #include "CyclePeakLookahead.h"
+#include <cstring> // memset
 
 #undef max
-#undef min // protect against Windows macros
-
+#undef min
 #define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
-    : lastSample_(0.0f)
+    : bufferWritePos_(0)
+    , lookaheadSamples_(0)
+    , lastSample_(0.0f)
     , cyclePeak_(0.0f)
     , previousCyclePeak_(0.0f)
-    , bufferWritePos_(0)
-    , lookaheadSamples_(0)
     , samplesSinceCycleStart_(0)
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
+    , currentCv_(1.0f)
+    , nextCvTarget_(1.0f)
+    , promoteIndex_(-1)
     , sampleRate_(0.0)
-    , cvStart_(1.0f)
-    , cvTarget_(1.0f)
-    , cycleLength_(1)
-    , cyclePos_(0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -31,30 +30,53 @@ int32_t CyclePeakLookahead::open()
 {
     sampleRate_ = getSampleRate();
 
-    lastSample_ = 0.0f;
-    cyclePeak_ = 0.0f;
-    previousCyclePeak_ = 0.0f;
-    samplesSinceCycleStart_ = 0;
-    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10ms
-    minCycleGuard_ = lastPositiveWidth_ / 4;
-
-    // 30 ms lookahead buffer
+    // 30 ms lookahead
     lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
-    setSubProcess(&CyclePeakLookahead::subProcess);
-    pinOut_.setStreaming(true);
-    pinCV_.setStreaming(true);
+    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
+    minCycleGuard_ = lastPositiveWidth_ / 4;
+
+    setSubProcess(&CyclePeakLookahead::subProcessSilent);
+    pinOut_.setStreaming(false);
+    pinCV_.setStreaming(false);
 
     return MpBase2::open();
 }
 
 void CyclePeakLookahead::onSetPins()
 {
-    pinOut_.setStreaming(true);
-    pinCV_.setStreaming(true);
-    setSubProcess(&CyclePeakLookahead::subProcess);
+    if (pinIn_.isStreaming())
+    {
+        setSubProcess(&CyclePeakLookahead::subProcess);
+        pinOut_.setStreaming(true);
+        pinCV_.setStreaming(true);
+    }
+    else
+    {
+        setSubProcess(&CyclePeakLookahead::subProcessSilent);
+        pinOut_.setStreaming(false);
+        pinCV_.setStreaming(false);
+    }
+}
+
+void CyclePeakLookahead::subProcessSilent(int sampleFrames)
+{
+    float* in = getBuffer(pinIn_);
+    if (in && pinIn_.isStreaming())
+    {
+        setSubProcess(&CyclePeakLookahead::subProcess);
+        pinOut_.setStreaming(true);
+        pinCV_.setStreaming(true);
+        subProcess(sampleFrames);
+        return;
+    }
+
+    float* out = getBuffer(pinOut_);
+    float* cvOut = getBuffer(pinCV_);
+    if (out) memset(out, 0, sampleFrames * sizeof(float));
+    if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
 }
 
 void CyclePeakLookahead::subProcess(int sampleFrames)
@@ -66,18 +88,19 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut)
         return;
 
-    // Read controls
-    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10 V
+    const float threshold = pinThreshold_ * 0.1f; // 0–10 V
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
+
+    const int bufferSize = lookaheadSamples_;
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Detect new cycle on positive zero-crossing (with guard) ---
+        // --- detect zero crossing on INPUT ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -85,33 +108,26 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 lastPositiveWidth_ = samplesSinceCycleStart_;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
 
-                // Commit peak of last cycle
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                // Setup interpolation for the new cycle
-                cvStart_ = cvTarget_;
-
+                // Compute next CV target
+                float newTarget = 1.0f;
                 if (previousCyclePeak_ > 0.0f)
                 {
                     float over = previousCyclePeak_ - threshold;
                     if (over < 0.0f) over = 0.0f;
-
                     float compressedPeak = threshold + over / ratio;
-
-                    // Normalize to input peak, scale to 0–10 V
-                    cvTarget_ = 1.0f * (compressedPeak / previousCyclePeak_);
-                }
-                else
-                {
-                    cvTarget_ = 1.0f; // idle = max CV
+                    newTarget = compressedPeak / previousCyclePeak_;
+                    if (newTarget < 0.0f) newTarget = 0.0f;
+                    if (newTarget > 1.0f) newTarget = 1.0f;
                 }
 
-                if (cvTarget_ < 0.0f) cvTarget_ = 0.0f;
-                if (cvTarget_ > 1.0f) cvTarget_ = 1.0f;
+                nextCvTarget_ = newTarget;
 
-                cycleLength_ = samplesSinceCycleStart_;
-                cyclePos_ = 0;
+                // Calculate promotion index in circular buffer
+                // We want to update currentCv_ when the delayed audio reaches THIS crossing
+                promoteIndex_ = (bufferWritePos_ + 1) % bufferSize;
 
                 samplesSinceCycleStart_ = 0;
             }
@@ -127,25 +143,23 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Write to lookahead buffer ---
+        // --- write to lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
 
-        // --- Read delayed sample ---
-        int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
+        // --- read delayed sample ---
+        int readPos = (bufferWritePos_ + 1) % bufferSize;
+
+        // Promote CV when delayed read pointer hits scheduled index
+        if (promoteIndex_ >= 0 && readPos == promoteIndex_)
+        {
+            currentCv_ = nextCvTarget_;
+            promoteIndex_ = -1; // clear until next detection
+        }
+
         out[s] = lookaheadBuffer_[readPos];
+        cvOut[s] = currentCv_;
 
-        // --- Interpolated CV output ---
-        float t = (cycleLength_ > 0) ? (float)cyclePos_ / (float)cycleLength_ : 1.0f;
-        float cvValue = cvStart_ + (cvTarget_ - cvStart_) * t;
-
-        if (cvValue < 0.0f) cvValue = 0.0f;
-        if (cvValue > 1.0f) cvValue = 1.0f;
-
-        cvOut[s] = cvValue;
-        cyclePos_++;
-
-        // --- Increment buffer write position ---
-        bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
+        bufferWritePos_ = (bufferWritePos_ + 1) % bufferSize;
     }
 }
 
