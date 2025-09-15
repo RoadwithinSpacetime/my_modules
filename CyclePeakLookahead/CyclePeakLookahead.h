@@ -13,33 +13,24 @@ public:
     int32_t open() override;
     void onSetPins() override;
     void subProcess(int sampleFrames);
-    void subProcessSilent(int sampleFrames);
 
 private:
     // Pins
     AudioInPin  pinIn_;
-    AudioOutPin pinOut_;
-    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
-    FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
-    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
+    AudioOutPin pinOut_;       // delayed audio out
+    AudioOutPin pinCV_;        // CV output (0..1 -> 0..10 V in SE)
+    FloatInPin  pinThreshold_; // threshold 0..1 (mapped to 0..10 V)
+    FloatInPin  pinRatio_;     // compression ratio (1:1..20:1)
 
-    // Lookahead buffer
+    // Look-ahead buffer
     std::vector<float> lookaheadBuffer_;
-    int bufferWritePos_;
-    int lookaheadSamples_;
+    int bufferWritePos_{};
+    int lookaheadSamples_{};
 
-    // Cycle tracking (input side)
-    float lastSample_;
-    float cyclePeak_;
-    float previousCyclePeak_;
-    int samplesSinceCycleStart_;
-    int lastPositiveWidth_;
-    int minCycleGuard_;
+    // Cycle tracking
+    float lastSample_{};
+    float cyclePeak_{};
+    float previousCyclePeak_{};
 
-    // CV control
-    float currentCv_;       // CV applied to output (delayed promotion)
-    float nextCvTarget_;    // CV calculated from input, waiting to be promoted
-    int   promoteIndex_;    // Buffer index at which to promote nextCvTarget
-
-    double sampleRate_;
+    double sampleRate_{};
 };
