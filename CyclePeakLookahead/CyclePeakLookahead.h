@@ -17,27 +17,30 @@ public:
 private:
     // Pins
     AudioInPin  pinIn_;
-    AudioOutPin pinOut_;       // delayed audio out
-    AudioOutPin pinCV_;        // CV out (normalized 0..1)
-    FloatInPin  pinThreshold_; // threshold (0..1 control -> mapped in code)
-    FloatInPin  pinRatio_;     // ratio (1..20)
+    AudioOutPin pinOut_;
+    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
+    FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
+    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
 
-    // Lookahead buffers (audio + CV)
+    // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
-    std::vector<float> cvBuffer_;      // parallel CV delay line
+    std::vector<float> cvBuffer_; // hold CV per delayed audio sample
     int bufferWritePos_;
-    int lookaheadSamples_; // 30 ms default
+    int lookaheadSamples_; // 30 ms in samples
 
-    // Cycle tracking (input side)
+    // Cycle tracking
     float lastSample_;
-    float cyclePeak_;          // running peak for current input cycle
-    float previousCyclePeak_;  // peak of the cycle that just finished
+    float cyclePeak_;
+    float previousCyclePeak_;
     int samplesSinceCycleStart_;
 
     // Adaptive zero-crossing guard
-    int lastPositiveWidth_;
-    int minCycleGuard_;
+    int lastPositiveWidth_; // length of previous positive half-cycle
+    int minCycleGuard_;     // quarter of that length
 
     // Misc
     double sampleRate_;
+
+    // CV output per cycle
+    float maxFrequency_ = 4000.0; // 4 kHz max frequency
 };
