@@ -13,27 +13,36 @@ public:
     int32_t open() override;
     void onSetPins() override;
     void subProcess(int sampleFrames);
+    void subProcessSilent(int sampleFrames);
 
 private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinPeak_; // audio-rate, per-cycle held peak aligned to delayed audio
+    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
+    FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
+    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
-    int   bufferWritePos_;
-    int   lookaheadSamples_; // 30 ms in samples
-
-    // Scheduled per-cycle peak (aligned with delayed audio)
-    std::vector<float> peakHoldBuffer_;
+    int bufferWritePos_;
+    int lookaheadSamples_; // 30 ms in samples
 
     // Cycle tracking
-    float  lastSample_;
-    float  cyclePeak_;           // max of current cycle
-    float  previousCyclePeak_;   // peak of previous cycle
-    int    samplesSinceCycleStart_; // samples since last zero-crossing
+    float lastSample_;
+    float cyclePeak_;
+    float previousCyclePeak_;
+    int samplesSinceCycleStart_;
+
+    // Adaptive zero-crossing guard
+    int lastPositiveWidth_; // length of previous positive half-cycle
+    int minCycleGuard_;     // quarter of that length
 
     // Misc
     double sampleRate_;
+
+    // CV output per cycle
+    float cvCurrent_;   // CV applied to output
+    float cvPending_;   // CV calculated from the just-finished cycle
+    bool  compressionArmed_; // false until first cycle crosses threshold
 };
