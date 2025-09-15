@@ -1,23 +1,22 @@
 #include "CyclePeakLookahead.h"
-#include <algorithm> // std::max
+#include <algorithm> // clamp
 #include <cstring>   // memset
-
 #undef max
-#undef min
+#undef min  // protect against Windows macros
 
+// Uncomment to enable full-wave peak detection
 #define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
-    : lastSample_(0.0f)
+    : bufferWritePos_(0)
+    , lookaheadSamples_(0)
+    , lastSample_(0.0f)
     , cyclePeak_(0.0f)
     , previousCyclePeak_(0.0f)
-    , bufferWritePos_(0)
-    , lookaheadSamples_(0)
     , samplesSinceCycleStart_(0)
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
     , sampleRate_(0.0)
-    , cvPending_(1.0f)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -30,44 +29,34 @@ int32_t CyclePeakLookahead::open()
 {
     sampleRate_ = getSampleRate();
 
-    // 30 ms lookahead buffer
-    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
-    lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
-    cvDelayBuffer_.assign(lookaheadSamples_, 1.0f);
-    bufferWritePos_ = 0;
+    lastSample_ = 0.0f;
+    cyclePeak_ = 0.0f;
+    previousCyclePeak_ = 0.0f;
+    samplesSinceCycleStart_ = 0;
 
-    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10ms
+    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
-    setSubProcess(&CyclePeakLookahead::subProcessSilent);
-    pinOut_.setStreaming(false);
-    pinCV_.setStreaming(false);
+    // 30 ms lookahead (audio + CV buffers must be same length)
+    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
+    if (lookaheadSamples_ < 1) lookaheadSamples_ = 1;
+
+    lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
+    cvBuffer_.assign(lookaheadSamples_, 1.0f); // unity CV by default
+    bufferWritePos_ = 0;
+
+    setSubProcess(&CyclePeakLookahead::subProcess);
+    pinOut_.setStreaming(true);
+    pinCV_.setStreaming(true);
 
     return MpBase2::open();
 }
 
 void CyclePeakLookahead::onSetPins()
 {
-    if (pinIn_.isStreaming())
-    {
-        setSubProcess(&CyclePeakLookahead::subProcess);
-        pinOut_.setStreaming(true);
-        pinCV_.setStreaming(true);
-    }
-    else
-    {
-        setSubProcess(&CyclePeakLookahead::subProcessSilent);
-        pinOut_.setStreaming(false);
-        pinCV_.setStreaming(false);
-    }
-}
-
-void CyclePeakLookahead::subProcessSilent(int sampleFrames)
-{
-    float* out = getBuffer(pinOut_);
-    float* cvOut = getBuffer(pinCV_);
-    if (out) memset(out, 0, sampleFrames * sizeof(float));
-    if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
+    pinOut_.setStreaming(true);
+    pinCV_.setStreaming(true);
+    setSubProcess(&CyclePeakLookahead::subProcess);
 }
 
 void CyclePeakLookahead::subProcess(int sampleFrames)
@@ -78,41 +67,65 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut)
         return;
 
-    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10 V
-    float ratio = std::clamp((float)pinRatio_, 1.0f, 20.0f);
+    // threshold mapping: you previously used *0.1 (0..1 -> 0..10V), keep that mapping
+    float threshold = pinThreshold_ * 0.1f;
+    float ratio = pinRatio_;
+    if (ratio < 1.0f) ratio = 1.0f;
+    if (ratio > 20.0f) ratio = 20.0f;
+
+    const int N = lookaheadSamples_;
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Detect positive zero-crossing (input domain) ---
+        // --- Detect positive zero-crossing (start of a new input cycle) ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
+            // only treat as new cycle if the previous half-cycle was long enough
             if (samplesSinceCycleStart_ > minCycleGuard_)
             {
-                lastPositiveWidth_ = samplesSinceCycleStart_;
+                // cycleLength is the number of samples of the cycle that just finished
+                int cycleLength = samplesSinceCycleStart_;
+
+                // update guards
+                lastPositiveWidth_ = cycleLength;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
 
-                // store previous peak
+                // previousCyclePeak_ holds the peak of the cycle that just finished
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                // Compute next CV based on completed input cycle
+                // --- compute compressed CV for that just-finished cycle ---
+                float cvValue = 1.0f; // unity by default
                 if (previousCyclePeak_ > 0.0f)
                 {
                     float over = previousCyclePeak_ - threshold;
                     if (over < 0.0f) over = 0.0f;
-                    float compressed = threshold + over / ratio;
+                    float compressedPeak = threshold + over / ratio;
 
-                    // Normalize to peak, range 0..1
-                    cvPending_ = std::clamp(compressed / previousCyclePeak_, 0.0f, 1.0f);
+                    // normalize compressedPeak relative to measured peak => 0..1
+                    cvValue = compressedPeak / previousCyclePeak_;
+                    if (cvValue < 0.0f) cvValue = 0.0f;
+                    if (cvValue > 1.0f) cvValue = 1.0f;
                 }
-                else
+
+                // --- RETRO-FILL the CV buffer for the samples belonging to the cycle that just finished ---
+                // The samples of that cycle are at indices (bufferWritePos_ - 1), (bufferWritePos_ - 2), ..., (bufferWritePos_ - cycleLength)
+                // Clamp cycleLength so we don't overwrite more than the buffer.
+                int fillCount = cycleLength;
+                if (fillCount > N) fillCount = N;
+
+                for (int i = 1; i <= fillCount; ++i)
                 {
-                    cvPending_ = 1.0f;
+                    int idx = bufferWritePos_ - i;
+                    idx %= N;
+                    if (idx < 0) idx += N;
+                    cvBuffer_[idx] = cvValue;
                 }
 
+                // reset sample counter for next cycle
                 samplesSinceCycleStart_ = 0;
             }
         }
@@ -127,15 +140,21 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Delay both audio and CV equally ---
+        // --- Write current audio sample into lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
-        cvDelayBuffer_[bufferWritePos_] = cvPending_;
 
-        int readPos = (bufferWritePos_ + 1) % lookaheadSamples_;
+        // Ensure current write slot has a sensible CV (hold last known CV if not yet retro-filled)
+        // We use the last cv stored at this slot (it may have been set by a previous retro-fill), so no overwrite here.
+        // If you prefer to force current slot to unity until retro-fill, uncomment next line:
+        // cvBuffer_[bufferWritePos_] = cvBuffer_[bufferWritePos_]; // no-op (kept for clarity)
+
+        // --- Read delayed outputs (audio and CV) from same read position ---
+        int readPos = (bufferWritePos_ + 1) % N;
         out[s] = lookaheadBuffer_[readPos];
-        cvOut[s] = cvDelayBuffer_[readPos];
+        cvOut[s] = cvBuffer_[readPos];
 
-        bufferWritePos_ = (bufferWritePos_ + 1) % lookaheadSamples_;
+        // --- advance write pointer ---
+        bufferWritePos_ = (bufferWritePos_ + 1) % N;
     }
 }
 

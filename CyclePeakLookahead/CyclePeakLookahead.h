@@ -13,29 +13,26 @@ public:
     int32_t open() override;
     void onSetPins() override;
     void subProcess(int sampleFrames);
-    void subProcessSilent(int sampleFrames);
 
 private:
     // Pins
     AudioInPin  pinIn_;
-    AudioOutPin pinOut_;
-    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
-    FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
-    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
+    AudioOutPin pinOut_;       // delayed audio out
+    AudioOutPin pinCV_;        // CV out (normalized 0..1)
+    FloatInPin  pinThreshold_; // threshold (0..1 control -> mapped in code)
+    FloatInPin  pinRatio_;     // ratio (1..20)
 
-    // Lookahead buffer for delayed audio
+    // Lookahead buffers (audio + CV)
     std::vector<float> lookaheadBuffer_;
+    std::vector<float> cvBuffer_;      // parallel CV delay line
     int bufferWritePos_;
-    int lookaheadSamples_; // ~30 ms of samples
+    int lookaheadSamples_; // 30 ms default
 
-    // CV delay buffer (same length as audio lookahead)
-    std::vector<float> cvDelayBuffer_;
-
-    // Cycle tracking (input domain)
+    // Cycle tracking (input side)
     float lastSample_;
-    float cyclePeak_;
-    float previousCyclePeak_;
-    int   samplesSinceCycleStart_;
+    float cyclePeak_;          // running peak for current input cycle
+    float previousCyclePeak_;  // peak of the cycle that just finished
+    int samplesSinceCycleStart_;
 
     // Adaptive zero-crossing guard
     int lastPositiveWidth_;
@@ -43,8 +40,4 @@ private:
 
     // Misc
     double sampleRate_;
-
-    // CV target computed from *input* peak but
-    // stored until the delayed cycle actually begins.
-    float cvPending_;
 };
