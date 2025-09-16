@@ -1,21 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="CyclePeakLookahead_SE" name="CyclePeakLookahead" category="RwS Modules">
-		<Description>Cycle peak detection with CV output (0–10 V compressor-style) with zero-crossing CV updates, attack and release</Description>
-		
-		<Audio>
-				<Pin name="In"  type="AudioIn" />
-				<Pin name="Out" type="AudioOut" />
-				<Pin name="CV"  type="AudioOut" />
-		</Audio>
-		
-		<Parameters>
-				<Param name="Threshold"  type="float" default="0.5" />
-				<Param name="Ratio"      type="float" default="2.0" />
-				<Param name="MaxFreq"    type="float" default="4000.0" unit="Hz" />
-				<Param name="Attack"     type="float" default="0.1" unit="ms" />
-				<Param name="Release"    type="float" default="50.0" unit="ms" />
-		</Parameters>
-	</Plugin>
+		<Description>Cycle peak detection with CV output (0–10 V compressor-style)</Description>
 
+		<Audio>
+			<!-- Audio pins -->
+			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
+			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
+			<Pin name="CV" datatype="float" direction="out" rate="audio"/>
+
+			<!-- Control pins -->
+			<Pin name="Threshold" datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Ratio" datatype="float" direction="in" rate="control" default="1.0"/>
+			<Pin name="Attack" datatype="float" direction="in" rate="control" default="0.1" unit="ms"/>
+			<Pin name="Release" datatype="float" direction="in" rate="control" default="50.0" unit="ms"/>
+			<Pin name="MaxFreq" datatype="float" direction="in" rate="control" default="4000.0" unit="Hz"/>
+		</Audio>
+
+		<Vendor>Road_within_Spacetime</Vendor>
+	</Plugin>
 </PluginList>
