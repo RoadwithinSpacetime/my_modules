@@ -1,5 +1,5 @@
 #include "CyclePeakLookahead.h"
-#include <algorithm> // std::clamp
+#include <algorithm> // clamp
 #include <cstring>   // memset
 #undef max
 #undef min  // protect against Windows macros
@@ -38,11 +38,12 @@ int32_t CyclePeakLookahead::open()
     lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
+    // 30 ms lookahead (audio + CV buffers must be same length)
     lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
     if (lookaheadSamples_ < 1) lookaheadSamples_ = 1;
 
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
-    cvBuffer_.assign(lookaheadSamples_, 1.0f);
+    cvBuffer_.assign(lookaheadSamples_, 1.0f); // unity CV by default
     bufferWritePos_ = 0;
 
     setSubProcess(&CyclePeakLookahead::subProcess);
@@ -59,41 +60,22 @@ void CyclePeakLookahead::onSetPins()
     setSubProcess(&CyclePeakLookahead::subProcess);
 }
 
-void CyclePeakLookahead::subProcessSilent(int sampleFrames)
-{
-    float* in = getBuffer(pinIn_);
-    if (in && pinIn_.isStreaming())
-    {
-        setSubProcess(&CyclePeakLookahead::subProcess);
-        pinOut_.setStreaming(true);
-        pinCV_.setStreaming(true);
-        subProcess(sampleFrames);
-        return;
-    }
-
-    float* out = getBuffer(pinOut_);
-    float* cvOut = getBuffer(pinCV_);
-    if (out) memset(out, 0, sampleFrames * sizeof(float));
-    if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
-}
-
 void CyclePeakLookahead::subProcess(int sampleFrames)
 {
     float* in = getBuffer(pinIn_);
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
-    if (!in || !out || !cvOut) return;
+    if (!in || !out || !cvOut)
+        return;
 
-    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10V
+    // Read controls
+    float threshold = pinThreshold_ * 0.1f;
     float ratio = pinRatio_;
     if (ratio < 1.0f) ratio = 1.0f;
     if (ratio > 20.0f) ratio = 20.0f;
 
-    float attackMs = pinAttack_;
-    float releaseMs = pinRelease_;
-
-    attackMs = std::clamp(attackMs, 0.02f, 1000.0f); // min 20 µs
-    releaseMs = std::clamp(releaseMs, 1.0f, 5000.0f); // min 1 ms
+    float attackTime = std::max(pinAttack_.getValue(), 20e-6f);
+    float releaseTime = std::max(pinRelease_.getValue(), 20e-6f);
 
     const int N = lookaheadSamples_;
 
@@ -102,6 +84,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
+        // --- Detect positive zero-crossing (start of a new input cycle) ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -113,6 +96,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
+                // --- compute compressed CV for that just-finished cycle ---
                 float cvValue = 1.0f;
                 if (previousCyclePeak_ > 0.0f)
                 {
@@ -123,13 +107,13 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                     cvValue = std::clamp(cvValue, 0.0f, 1.0f);
                 }
 
+                // --- RETRO-FILL CV buffer for the cycle that just finished ---
                 int fillCount = cycleLength;
                 if (fillCount > N) fillCount = N;
                 for (int i = 1; i <= fillCount; ++i)
                 {
                     int idx = bufferWritePos_ - i;
-                    idx %= N;
-                    if (idx < 0) idx += N;
+                    idx = (idx % N + N) % N; // safe modulo
                     cvBuffer_[idx] = cvValue;
                 }
 
@@ -147,12 +131,15 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
+        // --- Write current audio sample into lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
 
+        // --- Read delayed outputs (audio + CV) ---
         int readPos = (bufferWritePos_ + 1) % N;
         out[s] = lookaheadBuffer_[readPos];
         cvOut[s] = cvBuffer_[readPos];
 
+        // --- Advance write pointer ---
         bufferWritePos_ = (bufferWritePos_ + 1) % N;
     }
 }

@@ -22,8 +22,8 @@ private:
     AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
     FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
     FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
-    FloatInPin  pinAttack_;    // Attack time in ms
-    FloatInPin  pinRelease_;   // Release time in ms
+    FloatInPin  pinAttack_;    // Attack time (seconds)
+    FloatInPin  pinRelease_;   // Release time (seconds)
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
