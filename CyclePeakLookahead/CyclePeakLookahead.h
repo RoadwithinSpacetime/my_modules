@@ -13,6 +13,7 @@ public:
     int32_t open() override;
     void onSetPins() override;
     void subProcess(int sampleFrames);
+    void subProcessSilent(int sampleFrames);
 
 private:
     // Pins
@@ -21,10 +22,12 @@ private:
     AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
     FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
     FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
+    FloatInPin  pinAttack_;    // Attack time in ms
+    FloatInPin  pinRelease_;   // Release time in ms
 
     // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
-    std::vector<float> cvBuffer_; // hold CV per delayed audio sample
+    std::vector<float> cvBuffer_;
     int bufferWritePos_;
     int lookaheadSamples_; // 30 ms in samples
 
@@ -40,7 +43,4 @@ private:
 
     // Misc
     double sampleRate_;
-
-    // CV output per cycle
-    float maxFrequency_ = 4000.0; // 4 kHz max frequency
 };
