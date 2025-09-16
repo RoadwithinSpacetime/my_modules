@@ -12,9 +12,6 @@
 			<!-- Control pins -->
 			<Pin name="Threshold" datatype="float" direction="in" rate="control" default="0.5"/>
 			<Pin name="Ratio" datatype="float" direction="in" rate="control" default="1.0"/>
-			<Pin name="Attack" datatype="float" direction="in" rate="control" default="0.1" unit="ms"/>
-			<Pin name="Release" datatype="float" direction="in" rate="control" default="50.0" unit="ms"/>
-			<Pin name="MaxFreq" datatype="float" direction="in" rate="control" default="4000.0" unit="Hz"/>
 		</Audio>
 
 		<Vendor>Road_within_Spacetime</Vendor>
