@@ -10,11 +10,8 @@
 			<Pin name="CV" datatype="float" direction="out" rate="audio"/>
 
 			<!-- Control pins -->
-			<Pin name="Threshold" datatype="float" direction="in" rate="control" default="3.0"/>
+			<Pin name="Threshold" datatype="float" direction="in" rate="control" default="0.5"/>
 			<Pin name="Ratio" datatype="float" direction="in" rate="control" default="1.0"/>
-			<Pin name="Attack" datatype="float" direction="in" rate="control" default="0.1"/>
-			<Pin name="Release" datatype="float" direction="in" rate="control" default="50.0"/>
-			<Pin name="MaxFreq" datatype="float" direction="in" rate="control" default="4000.0"/>
 		</Audio>
 
 		<Vendor>Road_within_Spacetime</Vendor>
