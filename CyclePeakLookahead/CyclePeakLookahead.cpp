@@ -1,8 +1,8 @@
 #include "CyclePeakLookahead.h"
-#include <algorithm> // std::clamp
-#include <cstring>   // memset
+#include <algorithm>
+#include <cstring>
 #undef max
-#undef min  // protect against Windows macros
+#undef min
 
 #define FULL_WAVE_PEAK
 
@@ -15,6 +15,10 @@ CyclePeakLookahead::CyclePeakLookahead()
     , samplesSinceCycleStart_(0)
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
+    , rampLength_(5)               // 5 samples before + 5 after 10 sample window
+    , prevCvValue_(1.0f)
+    , nextCvValue_(1.0f)
+    , rampSamplesRemaining_(0)
     , sampleRate_(0.0)
 {
     initializePin(pinIn_);
@@ -22,8 +26,6 @@ CyclePeakLookahead::CyclePeakLookahead()
     initializePin(pinCV_);
     initializePin(pinThreshold_);
     initializePin(pinRatio_);
-    initializePin(pinAttack_);
-    initializePin(pinRelease_);
 }
 
 int32_t CyclePeakLookahead::open()
@@ -84,16 +86,8 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float* cvOut = getBuffer(pinCV_);
     if (!in || !out || !cvOut) return;
 
-    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10V
-    float ratio = pinRatio_;
-    if (ratio < 1.0f) ratio = 1.0f;
-    if (ratio > 20.0f) ratio = 20.0f;
-
-    float attackMs = pinAttack_;
-    float releaseMs = pinRelease_;
-
-    attackMs = std::clamp(attackMs, 0.02f, 1000.0f); // min 20 µs
-    releaseMs = std::clamp(releaseMs, 1.0f, 5000.0f); // min 1 ms
+    float threshold = pinThreshold_ * 0.1f;
+    float ratio = std::clamp(pinRatio_.getValue(), 1.0f, 20.0f);
 
     const int N = lookaheadSamples_;
 
@@ -102,6 +96,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
+        // --- Zero-cross detection ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -113,26 +108,17 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
 
-                float cvValue = 1.0f;
+                // compute next CV value
+                nextCvValue_ = 1.0f;
                 if (previousCyclePeak_ > 0.0f)
                 {
-                    float over = previousCyclePeak_ - threshold;
-                    if (over < 0.0f) over = 0.0f;
-                    float compressedPeak = threshold + over / ratio;
-                    cvValue = compressedPeak / previousCyclePeak_;
-                    cvValue = std::clamp(cvValue, 0.0f, 1.0f);
+                    float over = std::max(0.0f, previousCyclePeak_ - threshold);
+                    float compressed = threshold + over / ratio;
+                    nextCvValue_ = std::clamp(compressed / previousCyclePeak_, 0.0f, 1.0f);
                 }
 
-                int fillCount = cycleLength;
-                if (fillCount > N) fillCount = N;
-                for (int i = 1; i <= fillCount; ++i)
-                {
-                    int idx = bufferWritePos_ - i;
-                    idx %= N;
-                    if (idx < 0) idx += N;
-                    cvBuffer_[idx] = cvValue;
-                }
-
+                // start ramp: we already have prevCvValue_
+                rampSamplesRemaining_ = rampLength_ * 2; // total samples for ramp
                 samplesSinceCycleStart_ = 0;
             }
         }
@@ -147,8 +133,30 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
+        // write audio into lookahead buffer
         lookaheadBuffer_[bufferWritePos_] = x;
 
+        // --- CV ramp generation ---
+        float cvValue;
+        if (rampSamplesRemaining_ > 0)
+        {
+            // progress from old to new across rampLength_*2 samples
+            int samplesIntoRamp = (rampLength_ * 2) - rampSamplesRemaining_;
+            float t = static_cast<float>(samplesIntoRamp) / (rampLength_ * 2);
+            cvValue = prevCvValue_ + t * (nextCvValue_ - prevCvValue_);
+            --rampSamplesRemaining_;
+
+            if (rampSamplesRemaining_ == 0)
+                prevCvValue_ = nextCvValue_; // finished ramp
+        }
+        else
+        {
+            cvValue = prevCvValue_; // hold
+        }
+
+        cvBuffer_[bufferWritePos_] = cvValue;
+
+        // delayed output
         int readPos = (bufferWritePos_ + 1) % N;
         out[s] = lookaheadBuffer_[readPos];
         cvOut[s] = cvBuffer_[readPos];

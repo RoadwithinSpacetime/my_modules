@@ -22,14 +22,12 @@ private:
     AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
     FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
     FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
-    FloatInPin  pinAttack_;    // Attack time in ms
-    FloatInPin  pinRelease_;   // Release time in ms
 
-    // Lookahead audio delay
+    // Buffers
     std::vector<float> lookaheadBuffer_;
     std::vector<float> cvBuffer_;
     int bufferWritePos_;
-    int lookaheadSamples_; // 30 ms in samples
+    int lookaheadSamples_;
 
     // Cycle tracking
     float lastSample_;
@@ -37,10 +35,14 @@ private:
     float previousCyclePeak_;
     int samplesSinceCycleStart_;
 
-    // Adaptive zero-crossing guard
-    int lastPositiveWidth_; // length of previous positive half-cycle
-    int minCycleGuard_;     // quarter of that length
+    int lastPositiveWidth_;
+    int minCycleGuard_;
 
-    // Misc
+    // Ramp control
+    int rampLength_;           // samples for crossfade (half on each side of zero)
+    float prevCvValue_;
+    float nextCvValue_;
+    int rampSamplesRemaining_; // countdown for ramp
+
     double sampleRate_;
 };
