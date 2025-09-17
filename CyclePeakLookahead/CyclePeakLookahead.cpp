@@ -15,7 +15,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     , samplesSinceCycleStart_(0)
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
-    , rampLength_(5)               // 5 samples before + 5 after 10 sample window
+    , rampLength_(15)               // 15 samples before + 15 after 30 sample window
     , prevCvValue_(1.0f)
     , nextCvValue_(1.0f)
     , rampSamplesRemaining_(0)
