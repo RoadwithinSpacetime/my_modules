@@ -2,6 +2,7 @@
 #include "mp_sdk_audio.h"
 #include <cmath>
 #include <vector>
+#include <random>
 
 using namespace gmpi;
 
@@ -19,9 +20,11 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
-    FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
-    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
+    AudioOutPin pinCV_;
+    FloatInPin  pinThreshold_;
+    FloatInPin  pinRatio_;
+    FloatInPin  pinRamp_;      // Ramp length in samples
+    FloatInPin  pinRelease_;   // Minimum release in samples
 
     // Buffers
     std::vector<float> lookaheadBuffer_;
@@ -39,10 +42,16 @@ private:
     int minCycleGuard_;
 
     // Ramp control
-    int rampLength_;           // samples for crossfade (half on each side of zero)
+    int rampLength_;
     float prevCvValue_;
     float nextCvValue_;
-    int rampSamplesRemaining_; // countdown for ramp
+    int rampSamplesRemaining_;
 
     double sampleRate_;
+
+    // Release / dither
+    int releaseMin_;
+    float ditherAmount_;
+    std::mt19937 rng_;
+    std::uniform_real_distribution<float> ditherDist_;
 };
