@@ -2,6 +2,7 @@
 #include "mp_sdk_audio.h"
 #include <cmath>
 #include <vector>
+#include <algorithm>
 
 using namespace gmpi;
 
@@ -19,30 +20,31 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;        // CV out (0–10 V)
-    FloatInPin  pinThreshold_; // Threshold (0–1 mapped to 0–10 V)
-    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
+    AudioOutPin pinCV_;
+    FloatInPin  pinThreshold_;   // Threshold (0.0–1.0 mapped to 0–10 V)
+    FloatInPin  pinRatio_;       // Ratio (1:1 .. 20:1)
+    IntInPin    pinRampLength_;  // Ramp length in samples
 
     // Buffers
     std::vector<float> lookaheadBuffer_;
     std::vector<float> cvBuffer_;
-    int bufferWritePos_{};
-    int lookaheadSamples_{};
+    int bufferWritePos_ = 0;
+    int lookaheadSamples_ = 0;
 
     // Cycle tracking
-    float lastSample_{};
-    float cyclePeak_{};
-    float previousCyclePeak_{};
-    int   samplesSinceCycleStart_{};
+    float lastSample_ = 0.0f;
+    float cyclePeak_ = 0.0f;
+    float previousCyclePeak_ = 0.0f;
+    int   samplesSinceCycleStart_ = 0;
+    int   lastPositiveWidth_ = 0;
+    int   minCycleGuard_ = 0;
 
-    int lastPositiveWidth_{};
-    int minCycleGuard_{};
+    // Ramp control
+    int   rampLength_ = 10;      // user adjustable
+    bool  rampActive_ = false;
+    float prevCvValue_ = 1.0f;
+    float nextCvValue_ = 1.0f;
+    int   rampSamplesRemaining_ = 0;
 
-    // Ramp
-    int   rampLength_{ 10 };      // user ramp length in samples
-    int   rampSamplesRemaining_{};
-    float prevCvValue_{ 1.0f };
-    float nextCvValue_{ 1.0f };
-
-    double sampleRate_{};
+    double sampleRate_ = 0.0;
 };

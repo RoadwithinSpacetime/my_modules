@@ -1,14 +1,9 @@
 #include "CyclePeakLookahead.h"
-#include <algorithm>
 #include <cstring>
-#include <cmath>
+#include <algorithm>
+
 #undef max
 #undef min
-
-// Ensure a PI constant is available
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 #define FULL_WAVE_PEAK
 
@@ -19,6 +14,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     initializePin(pinCV_);
     initializePin(pinThreshold_);
     initializePin(pinRatio_);
+    initializePin(pinRampLength_);
 }
 
 int32_t CyclePeakLookahead::open()
@@ -49,6 +45,9 @@ int32_t CyclePeakLookahead::open()
 
 void CyclePeakLookahead::onSetPins()
 {
+    // Update user parameters
+    rampLength_ = std::max(1, pinRampLength_.getValue());
+
     pinOut_.setStreaming(true);
     pinCV_.setStreaming(true);
     setSubProcess(&CyclePeakLookahead::subProcess);
@@ -68,7 +67,7 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
 
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
-    if (out)  memset(out, 0, sampleFrames * sizeof(float));
+    if (out) memset(out, 0, sampleFrames * sizeof(float));
     if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
 }
 
@@ -79,7 +78,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float* cvOut = getBuffer(pinCV_);
     if (!in || !out || !cvOut) return;
 
-    float threshold = pinThreshold_ * 0.1f; // 0–1 -> 0–10 V
+    float threshold = pinThreshold_ * 0.1f; // scale to volts
     float ratio = std::clamp(pinRatio_.getValue(), 1.0f, 20.0f);
 
     const int N = lookaheadSamples_;
@@ -89,31 +88,42 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        //--- Zero-cross detection (start of NEXT cycle) ---
+        // --- Trigger ramp BEFORE zero crossing ---
+        int rampStart = lastPositiveWidth_ - rampLength_;
+        if (!rampActive_
+            && lastPositiveWidth_ > rampLength_
+            && samplesSinceCycleStart_ >= rampStart)
+        {
+            // Compute next CV value ahead of crossing
+            nextCvValue_ = 1.0f;
+            if (cyclePeak_ > 0.0f)
+            {
+                float over = std::max(0.0f, cyclePeak_ - threshold);
+                float compressed = threshold + over / ratio;
+                nextCvValue_ = std::clamp(compressed / cyclePeak_, 0.0f, 1.0f);
+            }
+
+            rampSamplesRemaining_ = rampLength_;
+            rampActive_ = true;
+        }
+
+        // --- Zero-cross detection ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
             {
-                int cycleLength = samplesSinceCycleStart_;
-                lastPositiveWidth_ = cycleLength;
+                lastPositiveWidth_ = samplesSinceCycleStart_;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
 
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
-
-                // compute next CV value
-                nextCvValue_ = 1.0f;
-                if (previousCyclePeak_ > 0.0f)
-                {
-                    float over = std::max(0.0f, previousCyclePeak_ - threshold);
-                    float compressed = threshold + over / ratio;
-                    nextCvValue_ = std::clamp(compressed / previousCyclePeak_, 0.0f, 1.0f);
-                }
-
-                // schedule ramp to END at this zero crossing
-                // ramp starts rampLength_ samples BEFORE crossing
-                rampSamplesRemaining_ = rampLength_;
                 samplesSinceCycleStart_ = 0;
+
+                // At crossing, ramp should be complete:
+                if (!rampActive_)
+                {
+                    prevCvValue_ = nextCvValue_;
+                }
             }
         }
 
@@ -127,29 +137,32 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- Ramp generation (Hann taper) ---
+        // --- CV ramp generation ---
         float cvValue;
-        if (rampSamplesRemaining_ > 0)
+        if (rampActive_)
         {
-            // progress from start->target over rampLength_ samples
+            // progress from old to new across rampLength_ samples
             int samplesIntoRamp = rampLength_ - rampSamplesRemaining_;
-            float t = static_cast<float>(samplesIntoRamp) / static_cast<float>(rampLength_);
-            // Hann curve for smoother spectrum
-            float w = 0.5f * (1.0f - std::cos(static_cast<float>(M_PI) * t));
-            cvValue = prevCvValue_ + w * (nextCvValue_ - prevCvValue_);
+            float t = static_cast<float>(samplesIntoRamp) / (float)rampLength_;
+            cvValue = prevCvValue_ + t * (nextCvValue_ - prevCvValue_);
             --rampSamplesRemaining_;
-            if (rampSamplesRemaining_ == 0)
+
+            if (rampSamplesRemaining_ <= 0)
+            {
+                rampActive_ = false;
                 prevCvValue_ = nextCvValue_;
+            }
         }
         else
         {
             cvValue = prevCvValue_;
         }
 
-        // write into circular buffers
+        // Write into lookahead buffer
         lookaheadBuffer_[bufferWritePos_] = x;
         cvBuffer_[bufferWritePos_] = cvValue;
 
+        // Delayed output
         int readPos = (bufferWritePos_ + 1) % N;
         out[s] = lookaheadBuffer_[readPos];
         cvOut[s] = cvBuffer_[readPos];
