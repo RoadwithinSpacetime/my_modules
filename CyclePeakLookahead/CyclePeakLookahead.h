@@ -46,5 +46,9 @@ private:
     float nextCvValue_ = 1.0f;
     int   rampSamplesRemaining_ = 0;
 
+    // Ceil (quantisation) control
+    bool  useCeil_ = true;       // enable/disable upward quantisation
+    float ceilStep_ = 0.1f;      // step size (e.g. 0.1 = 0.1 dB/V steps)
+
     double sampleRate_ = 0.0;
 };
