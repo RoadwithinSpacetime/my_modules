@@ -1,20 +1,29 @@
 #include "CyclePeakLookahead.h"
-#include <cstring>
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+#include <algorithm> // std::clamp
+#include <cstring>   // memset
+#undef max
+#undef min  // protect against Windows macros
 
 #define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
+    : bufferWritePos_(0)
+    , lookaheadSamples_(0)
+    , lastSample_(0.0f)
+    , cyclePeak_(0.0f)
+    , previousCyclePeak_(0.0f)
+    , samplesSinceCycleStart_(0)
+    , lastPositiveWidth_(0)
+    , minCycleGuard_(0)
+    , sampleRate_(0.0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
     initializePin(pinCV_);
     initializePin(pinThreshold_);
     initializePin(pinRatio_);
-    initializePin(pinRampLength_);
+    initializePin(pinAttack_);
+    initializePin(pinRelease_);
 }
 
 int32_t CyclePeakLookahead::open()
@@ -26,12 +35,11 @@ int32_t CyclePeakLookahead::open()
     previousCyclePeak_ = 0.0f;
     samplesSinceCycleStart_ = 0;
 
-    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // initial guess ~10 ms
+    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
     lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
-    if (lookaheadSamples_ < 1)
-        lookaheadSamples_ = 1;
+    if (lookaheadSamples_ < 1) lookaheadSamples_ = 1;
 
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     cvBuffer_.assign(lookaheadSamples_, 1.0f);
@@ -46,10 +54,6 @@ int32_t CyclePeakLookahead::open()
 
 void CyclePeakLookahead::onSetPins()
 {
-    // still read ramp length for completeness, but unused
-    int userRamp = pinRampLength_.getValue();
-    rampLength_ = (std::max)(1, userRamp);
-
     pinOut_.setStreaming(true);
     pinCV_.setStreaming(true);
     setSubProcess(&CyclePeakLookahead::subProcess);
@@ -69,7 +73,7 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
 
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
-    if (out)   memset(out, 0, sampleFrames * sizeof(float));
+    if (out) memset(out, 0, sampleFrames * sizeof(float));
     if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
 }
 
@@ -80,8 +84,16 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float* cvOut = getBuffer(pinCV_);
     if (!in || !out || !cvOut) return;
 
-    float threshold = pinThreshold_ * 0.1f; // 0–1 to 0–10 V
-    float ratio = std::clamp(pinRatio_.getValue(), 1.0f, 20.0f);
+    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10V
+    float ratio = pinRatio_;
+    if (ratio < 1.0f) ratio = 1.0f;
+    if (ratio > 20.0f) ratio = 20.0f;
+
+    float attackMs = pinAttack_;
+    float releaseMs = pinRelease_;
+
+    attackMs = std::clamp(attackMs, 0.02f, 1000.0f); // min 20 µs
+    releaseMs = std::clamp(releaseMs, 1.0f, 5000.0f); // min 1 ms
 
     const int N = lookaheadSamples_;
 
@@ -90,28 +102,37 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // ---- Predict zero crossing and compute next CV ----
-        // (We still compute nextCvValue_ as soon as rampStart is reached)
-        int predictedEnd = lastPositiveWidth_;
-        int rampStart = predictedEnd - rampLength_;
-        if (predictedEnd > rampLength_ && samplesSinceCycleStart_ >= rampStart)
-        {
-            float over = std::fmax(0.0f, cyclePeak_ - threshold);
-            float compressed = threshold + over / ratio;
-            nextCvValue_ = (cyclePeak_ > 0.0f)
-                ? std::clamp(compressed / cyclePeak_, 0.0f, 1.0f)
-                : 1.0f;
-        }
-
-        // ---- Zero-cross detection ----
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
             {
-                lastPositiveWidth_ = samplesSinceCycleStart_;
+                int cycleLength = samplesSinceCycleStart_;
+                lastPositiveWidth_ = cycleLength;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
+
                 previousCyclePeak_ = cyclePeak_;
                 cyclePeak_ = 0.0f;
+
+                float cvValue = 1.0f;
+                if (previousCyclePeak_ > 0.0f)
+                {
+                    float over = previousCyclePeak_ - threshold;
+                    if (over < 0.0f) over = 0.0f;
+                    float compressedPeak = threshold + over / ratio;
+                    cvValue = compressedPeak / previousCyclePeak_;
+                    cvValue = std::clamp(cvValue, 0.0f, 1.0f);
+                }
+
+                int fillCount = cycleLength;
+                if (fillCount > N) fillCount = N;
+                for (int i = 1; i <= fillCount; ++i)
+                {
+                    int idx = bufferWritePos_ - i;
+                    idx %= N;
+                    if (idx < 0) idx += N;
+                    cvBuffer_[idx] = cvValue;
+                }
+
                 samplesSinceCycleStart_ = 0;
             }
         }
@@ -126,23 +147,8 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
 
         lastSample_ = x;
 
-        // --- write audio into lookahead buffer ---
         lookaheadBuffer_[bufferWritePos_] = x;
 
-        // --- Immediate CV output (NO ramp) ---
-        float cvValue = nextCvValue_;
-        prevCvValue_ = nextCvValue_;
-
-        // --- optional ceiling quantisation ---
-        if (useCeil_ && ceilStep_ > 0.0f)
-        {
-            cvValue = std::ceil(cvValue / ceilStep_) * ceilStep_;
-            if (cvValue > 1.0f) cvValue = 1.0f;
-        }
-
-        cvBuffer_[bufferWritePos_] = cvValue;
-
-        // --- delayed output for lookahead audio ---
         int readPos = (bufferWritePos_ + 1) % N;
         out[s] = lookaheadBuffer_[readPos];
         cvOut[s] = cvBuffer_[readPos];

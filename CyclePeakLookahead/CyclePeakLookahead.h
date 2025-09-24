@@ -2,7 +2,6 @@
 #include "mp_sdk_audio.h"
 #include <cmath>
 #include <vector>
-#include <algorithm>
 
 using namespace gmpi;
 
@@ -20,35 +19,28 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;
-    FloatInPin  pinThreshold_;   // Threshold (0.0–1.0 mapped to 0–10 V)
-    FloatInPin  pinRatio_;       // Ratio (1:1 .. 20:1)
-    IntInPin    pinRampLength_;  // Ramp length in samples (ignored in this test)
+    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
+    FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
+    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
+    FloatInPin  pinAttack_;    // Attack time in ms
+    FloatInPin  pinRelease_;   // Release time in ms
 
-    // Buffers
+    // Lookahead audio delay
     std::vector<float> lookaheadBuffer_;
     std::vector<float> cvBuffer_;
-    int bufferWritePos_ = 0;
-    int lookaheadSamples_ = 0;
+    int bufferWritePos_;
+    int lookaheadSamples_; // 30 ms in samples
 
     // Cycle tracking
-    float lastSample_ = 0.0f;
-    float cyclePeak_ = 0.0f;
-    float previousCyclePeak_ = 0.0f;
-    int   samplesSinceCycleStart_ = 0;
-    int   lastPositiveWidth_ = 0;
-    int   minCycleGuard_ = 0;
+    float lastSample_;
+    float cyclePeak_;
+    float previousCyclePeak_;
+    int samplesSinceCycleStart_;
 
-    // Ramp control (disabled in this test)
-    int   rampLength_ = 10;
-    bool  rampActive_ = false;
-    float prevCvValue_ = 1.0f;
-    float nextCvValue_ = 1.0f;
-    int   rampSamplesRemaining_ = 0;
+    // Adaptive zero-crossing guard
+    int lastPositiveWidth_; // length of previous positive half-cycle
+    int minCycleGuard_;     // quarter of that length
 
-    // Ceil (quantisation) control
-    bool  useCeil_ = true;       // keep ceil active for testing
-    float ceilStep_ = 0.1f;      // step size
-
-    double sampleRate_ = 0.0;
+    // Misc
+    double sampleRate_;
 };
