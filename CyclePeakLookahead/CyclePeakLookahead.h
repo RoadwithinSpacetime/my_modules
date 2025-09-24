@@ -2,6 +2,7 @@
 #include "mp_sdk_audio.h"
 #include <cmath>
 #include <vector>
+#include <algorithm>
 
 using namespace gmpi;
 
@@ -25,7 +26,7 @@ private:
     FloatInPin  pinAttack_;    // Attack time in ms
     FloatInPin  pinRelease_;   // Release time in ms
 
-    // --- Lookahead audio delay ---
+    // --- Buffers ---
     std::vector<float> lookaheadBuffer_;
     std::vector<float> cvBuffer_;
     int bufferWritePos_;
@@ -35,15 +36,14 @@ private:
     float lastSample_;
     float cyclePeak_;
     float previousCyclePeak_;
-    int   samplesSinceCycleStart_;
+    int samplesSinceCycleStart_;
+    int lastPositiveWidth_;
+    int minCycleGuard_;
 
-    // Adaptive zero-crossing guard
-    int lastPositiveWidth_; // length of previous positive half-cycle
-    int minCycleGuard_;     // quarter of that length
-
-    // --- CV smoothing & quantization ---
-    float cvFiltered_;     // 1-pole filtered CV value
-    float cvFilterCoeff_;  // 1-pole filter coefficient
+    // --- Quantisation (ceil/floor) ---
+    bool  useCeil_ = true;   // enable upward rounding
+    bool  useFloor_ = true;  // enable downward rounding
+    float quantStep_ = 0.1f; // step size (1 decimal, 0.1 V)
 
     // --- Misc ---
     double sampleRate_;
