@@ -23,7 +23,7 @@ private:
     AudioOutPin pinCV_;
     FloatInPin  pinThreshold_;   // Threshold (0.0–1.0 mapped to 0–10 V)
     FloatInPin  pinRatio_;       // Ratio (1:1 .. 20:1)
-    IntInPin    pinRampLength_;  // Ramp length in samples
+    IntInPin    pinRampLength_;  // Ramp length in samples (ignored in this test)
 
     // Buffers
     std::vector<float> lookaheadBuffer_;
@@ -39,17 +39,16 @@ private:
     int   lastPositiveWidth_ = 0;
     int   minCycleGuard_ = 0;
 
-    // Ramp control
+    // Ramp control (disabled in this test)
     int   rampLength_ = 10;
     bool  rampActive_ = false;
-    bool  firstCycle_ = true;
     float prevCvValue_ = 1.0f;
     float nextCvValue_ = 1.0f;
     int   rampSamplesRemaining_ = 0;
 
-    // Ceil quantisation
-    bool  useCeil_ = true;   // enable upward quantisation
-    float ceilStep_ = 0.1f;  // step size (0.1 = quantise to 0.1 steps)
+    // Ceil (quantisation) control
+    bool  useCeil_ = true;       // keep ceil active for testing
+    float ceilStep_ = 0.1f;      // step size
 
     double sampleRate_ = 0.0;
 };
