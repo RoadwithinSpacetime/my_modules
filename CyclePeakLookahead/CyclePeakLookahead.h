@@ -40,15 +40,16 @@ private:
     int   minCycleGuard_ = 0;
 
     // Ramp control
-    int   rampLength_ = 10;      // user adjustable
+    int   rampLength_ = 10;
     bool  rampActive_ = false;
+    bool  firstCycle_ = true;
     float prevCvValue_ = 1.0f;
     float nextCvValue_ = 1.0f;
     int   rampSamplesRemaining_ = 0;
 
-    // Ceil (quantisation) control
-    bool  useCeil_ = true;       // enable/disable upward quantisation
-    float ceilStep_ = 0.1f;      // step size (e.g. 0.1 = 0.1 dB/V steps)
+    // Ceil quantisation
+    bool  useCeil_ = true;   // enable upward quantisation
+    float ceilStep_ = 0.1f;  // step size (0.1 = quantise to 0.1 steps)
 
     double sampleRate_ = 0.0;
 };
