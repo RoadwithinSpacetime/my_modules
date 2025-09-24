@@ -16,7 +16,7 @@ public:
     void subProcessSilent(int sampleFrames);
 
 private:
-    // Pins
+    // --- Pins ---
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
     AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
@@ -25,22 +25,26 @@ private:
     FloatInPin  pinAttack_;    // Attack time in ms
     FloatInPin  pinRelease_;   // Release time in ms
 
-    // Lookahead audio delay
+    // --- Lookahead audio delay ---
     std::vector<float> lookaheadBuffer_;
     std::vector<float> cvBuffer_;
     int bufferWritePos_;
     int lookaheadSamples_; // 30 ms in samples
 
-    // Cycle tracking
+    // --- Cycle tracking ---
     float lastSample_;
     float cyclePeak_;
     float previousCyclePeak_;
-    int samplesSinceCycleStart_;
+    int   samplesSinceCycleStart_;
 
     // Adaptive zero-crossing guard
     int lastPositiveWidth_; // length of previous positive half-cycle
     int minCycleGuard_;     // quarter of that length
 
-    // Misc
+    // --- CV smoothing & quantization ---
+    float cvFiltered_;     // 1-pole filtered CV value
+    float cvFilterCoeff_;  // 1-pole filter coefficient
+
+    // --- Misc ---
     double sampleRate_;
 };

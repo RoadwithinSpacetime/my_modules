@@ -4,6 +4,10 @@
 #undef max
 #undef min  // protect against Windows macros
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
@@ -16,6 +20,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
     , sampleRate_(0.0)
+    , cvFiltered_(1.0f)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -45,6 +50,10 @@ int32_t CyclePeakLookahead::open()
     cvBuffer_.assign(lookaheadSamples_, 1.0f);
     bufferWritePos_ = 0;
 
+    // 1-pole filter coefficient (~1 ms smoothing)
+    const float tauMs = 1.0f;
+    cvFilterCoeff_ = std::exp(-1.0f / (0.001f * static_cast<float>(sampleRate_) * tauMs));
+
     setSubProcess(&CyclePeakLookahead::subProcess);
     pinOut_.setStreaming(true);
     pinCV_.setStreaming(true);
@@ -73,7 +82,7 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
 
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
-    if (out) memset(out, 0, sampleFrames * sizeof(float));
+    if (out)   memset(out, 0, sampleFrames * sizeof(float));
     if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
 }
 
@@ -84,18 +93,14 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float* cvOut = getBuffer(pinCV_);
     if (!in || !out || !cvOut) return;
 
-    float threshold = pinThreshold_ * 0.1f; // map 0–1 -> 0–10V
-    float ratio = pinRatio_;
-    if (ratio < 1.0f) ratio = 1.0f;
-    if (ratio > 20.0f) ratio = 20.0f;
-
-    float attackMs = pinAttack_;
-    float releaseMs = pinRelease_;
-
-    attackMs = std::clamp(attackMs, 0.02f, 1000.0f); // min 20 µs
-    releaseMs = std::clamp(releaseMs, 1.0f, 5000.0f); // min 1 ms
+    // ---- Fixed clamp calls ----
+    float threshold = static_cast<float>(pinThreshold_) * 0.1f; // map 0–1 -> 0–10V
+    float ratio = std::clamp(static_cast<float>(pinRatio_), 1.0f, 20.0f);
+    float attackMs = std::clamp(static_cast<float>(pinAttack_), 0.02f, 1000.0f);
+    float releaseMs = std::clamp(static_cast<float>(pinRelease_), 1.0f, 5000.0f);
 
     const int N = lookaheadSamples_;
+    const float step = 0.1f; // ceil/floor step size
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -123,6 +128,13 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                     cvValue = std::clamp(cvValue, 0.0f, 1.0f);
                 }
 
+                // Ceil & floor to 1 decimal
+                cvValue = std::ceil(cvValue / step) * step;
+                cvValue = std::floor(cvValue / step) * step;
+
+                // Apply 1-pole filter
+                cvFiltered_ = cvFiltered_ + (cvValue - cvFiltered_) * (1.0f - cvFilterCoeff_);
+
                 int fillCount = cycleLength;
                 if (fillCount > N) fillCount = N;
                 for (int i = 1; i <= fillCount; ++i)
@@ -130,7 +142,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                     int idx = bufferWritePos_ - i;
                     idx %= N;
                     if (idx < 0) idx += N;
-                    cvBuffer_[idx] = cvValue;
+                    cvBuffer_[idx] = cvFiltered_;
                 }
 
                 samplesSinceCycleStart_ = 0;
