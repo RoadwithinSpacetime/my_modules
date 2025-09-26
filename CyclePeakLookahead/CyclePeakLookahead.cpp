@@ -1,6 +1,6 @@
 #include "CyclePeakLookahead.h"
 #include <cstring>   // memset
-#include <algorithm> // std::max, std::clamp
+#include <algorithm> // std::max, std::min
 #undef max
 #undef min  // protect against Windows macros
 
@@ -20,6 +20,8 @@ CyclePeakLookahead::CyclePeakLookahead()
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
     , sampleRate_(0.0)
+    , quantStep_(0.1f)      // step size for ceil quantization (0.1 = 1 decimal)
+    , useCeil_(true)        // enable ceil
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -121,12 +123,10 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                     cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
                 }
 
-                // --- Ceil & Floor quantisation (1 decimal) ---
-                if (quantStep_ > 0.0f)
+                // --- Ceil quantisation (1 decimal) ---
+                if (quantStep_ > 0.0f && useCeil_)
                 {
-                    if (useCeil_)
-                        cvValue = std::ceil(cvValue / quantStep_) * quantStep_;
-                    
+                    cvValue = std::ceil(cvValue / quantStep_) * quantStep_;
                     cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
                 }
 
