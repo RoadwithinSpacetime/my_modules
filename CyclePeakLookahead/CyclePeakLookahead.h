@@ -43,7 +43,7 @@ private:
     // --- Quantisation (ceil/floor) ---
     bool  useCeil_ = true;   // enable upward rounding
     bool  useFloor_ = true;  // enable downward rounding
-    float quantStep_ = 0.1f; // step size (1 decimal, 0.1 V)
+    float quantStep_ = 1.0f; // step size (1 decimal, 0.1 V)
 
     // --- Misc ---
     double sampleRate_;
