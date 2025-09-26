@@ -1,8 +1,8 @@
 #include "CyclePeakLookahead.h"
-#include <cstring>   // memset
-#include <algorithm> // std::max, std::min
+#include <cstring>
+#include <algorithm>
 #undef max
-#undef min  // protect against Windows macros
+#undef min
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -11,23 +11,12 @@
 #define FULL_WAVE_PEAK
 
 CyclePeakLookahead::CyclePeakLookahead()
-    : bufferWritePos_(0)
-    , lookaheadSamples_(0)
-    , lastSample_(0.0f)
-    , cyclePeak_(0.0f)
-    , previousCyclePeak_(0.0f)
-    , samplesSinceCycleStart_(0)
-    , lastPositiveWidth_(0)
-    , minCycleGuard_(0)
-    , sampleRate_(0.0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
     initializePin(pinCV_);
     initializePin(pinThreshold_);
     initializePin(pinRatio_);
-    initializePin(pinAttack_);
-    initializePin(pinRelease_);
 }
 
 int32_t CyclePeakLookahead::open()
@@ -92,9 +81,11 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float ratio = pinRatio_;
     ratio = (std::max)(1.0f, (std::min)(20.0f, ratio));
 
-    const int   N = lookaheadSamples_;
-    const float highFreqGuardHz = 4000.0f;
-    const float minSamplesFor4k = static_cast<float>(sampleRate_) / highFreqGuardHz;
+    const int N = lookaheadSamples_;
+
+    // Crossfade frequency range (Hz)
+    const float fadeLow = 3500.0f;
+    const float fadeHigh = 4200.0f;
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -114,31 +105,30 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 cyclePeak_ = 0.0f;
 
                 float cvValue = 1.0f;
-
-                // ---- High-frequency guard ----
-                if (cycleLength < minSamplesFor4k)
+                if (previousCyclePeak_ > 0.0f)
                 {
-                    // Frequency above ~4 kHz: force full scale (1.0 -> 10 V)
+                    float over = previousCyclePeak_ - threshold;
+                    if (over < 0.0f) over = 0.0f;
+                    float compressedPeak = threshold + over / ratio;
+                    cvValue = compressedPeak / previousCyclePeak_;
+                    cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
+                }
+
+                // --- Frequency guard with crossfade ---
+                float freq = sampleRate_ / (float)cycleLength;
+                if (freq >= fadeHigh)
+                {
+                    // full CV above high limit
                     cvValue = 1.0f;
                 }
-                else
+                else if (freq > fadeLow)
                 {
-                    if (previousCyclePeak_ > 0.0f)
-                    {
-                        float over = previousCyclePeak_ - threshold;
-                        if (over < 0.0f) over = 0.0f;
-                        float compressedPeak = threshold + over / ratio;
-                        cvValue = compressedPeak / previousCyclePeak_;
-                        cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
-                    }
-
-                    // --- Ceil quantisation (0.1 V steps) ---
-                    if (quantStep_ > 0.0f && useCeil_)
-                    {
-                        cvValue = std::ceil(cvValue / quantStep_) * quantStep_;
-                        cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
-                    }
+                    // crossfade between normal and full
+                    float mixAmt = (freq - fadeLow) / (fadeHigh - fadeLow);
+                    float compressedVal = cvValue;
+                    cvValue = compressedVal * (1.0f - mixAmt) + 1.0f * mixAmt;
                 }
+                // else normal compression below fadeLow
 
                 // backfill CV buffer for the just-finished cycle
                 int fillCount = cycleLength;
