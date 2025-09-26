@@ -126,8 +126,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 {
                     if (useCeil_)
                         cvValue = std::ceil(cvValue / quantStep_) * quantStep_;
-                    if (useFloor_)
-                        cvValue = std::floor(cvValue / quantStep_) * quantStep_;
+                    
                     cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
                 }
 
