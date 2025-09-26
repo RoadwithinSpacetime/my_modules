@@ -17,33 +17,32 @@ public:
     void subProcessSilent(int sampleFrames);
 
 private:
-    // --- Pins ---
+    // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;        // Control Voltage out (0–10 V)
-    FloatInPin  pinThreshold_; // Threshold (0.0–1.0 mapped to 0–10 V)
-    FloatInPin  pinRatio_;     // Ratio (1:1 .. 20:1)
-    FloatInPin  pinAttack_;    // Attack time in ms
-    FloatInPin  pinRelease_;   // Release time in ms
+    AudioOutPin pinCV_;
+    FloatInPin  pinThreshold_;   // Threshold (0.0–1.0 mapped to 0–10 V)
+    FloatInPin  pinRatio_;       // Ratio (1:1 .. 20:1)
+    FloatInPin  pinAttack_;      // (unused, kept for compatibility)
+    FloatInPin  pinRelease_;     // (unused, kept for compatibility)
 
-    // --- Buffers ---
+    // Buffers
     std::vector<float> lookaheadBuffer_;
     std::vector<float> cvBuffer_;
     int bufferWritePos_;
-    int lookaheadSamples_; // 30 ms in samples
+    int lookaheadSamples_;
 
-    // --- Cycle tracking ---
+    // Cycle tracking
     float lastSample_;
     float cyclePeak_;
     float previousCyclePeak_;
-    int samplesSinceCycleStart_;
-    int lastPositiveWidth_;
-    int minCycleGuard_;
+    int   samplesSinceCycleStart_;
+    int   lastPositiveWidth_;
+    int   minCycleGuard_;
 
-    // --- Quantisation (ceil/floor) ---
-    bool  useCeil_ = true;   // enable upward rounding
-    float quantStep_ = 0.1f; // step size (1 decimal, 0.1 V)
-
-    // --- Misc ---
     double sampleRate_;
+
+    // Quantisation
+    float quantStep_ = 0.1f; // Ceil quantisation step (0.1 = 0.1 V steps)
+    bool  useCeil_ = true; // enable/disable ceil quantisation
 };

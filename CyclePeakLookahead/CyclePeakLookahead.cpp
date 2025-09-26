@@ -20,8 +20,6 @@ CyclePeakLookahead::CyclePeakLookahead()
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
     , sampleRate_(0.0)
-    , quantStep_(0.1f)      // step size for ceil quantization (0.1 = 1 decimal)
-    , useCeil_(true)        // enable ceil
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -94,7 +92,9 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float ratio = pinRatio_;
     ratio = (std::max)(1.0f, (std::min)(20.0f, ratio));
 
-    const int N = lookaheadSamples_;
+    const int   N = lookaheadSamples_;
+    const float highFreqGuardHz = 4000.0f;
+    const float minSamplesFor4k = static_cast<float>(sampleRate_) / highFreqGuardHz;
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -114,20 +114,30 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 cyclePeak_ = 0.0f;
 
                 float cvValue = 1.0f;
-                if (previousCyclePeak_ > 0.0f)
-                {
-                    float over = previousCyclePeak_ - threshold;
-                    if (over < 0.0f) over = 0.0f;
-                    float compressedPeak = threshold + over / ratio;
-                    cvValue = compressedPeak / previousCyclePeak_;
-                    cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
-                }
 
-                // --- Ceil quantisation (1 decimal) ---
-                if (quantStep_ > 0.0f && useCeil_)
+                // ---- High-frequency guard ----
+                if (cycleLength < minSamplesFor4k)
                 {
-                    cvValue = std::ceil(cvValue / quantStep_) * quantStep_;
-                    cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
+                    // Frequency above ~4 kHz: force full scale (1.0 -> 10 V)
+                    cvValue = 1.0f;
+                }
+                else
+                {
+                    if (previousCyclePeak_ > 0.0f)
+                    {
+                        float over = previousCyclePeak_ - threshold;
+                        if (over < 0.0f) over = 0.0f;
+                        float compressedPeak = threshold + over / ratio;
+                        cvValue = compressedPeak / previousCyclePeak_;
+                        cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
+                    }
+
+                    // --- Ceil quantisation (0.1 V steps) ---
+                    if (quantStep_ > 0.0f && useCeil_)
+                    {
+                        cvValue = std::ceil(cvValue / quantStep_) * quantStep_;
+                        cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
+                    }
                 }
 
                 // backfill CV buffer for the just-finished cycle
