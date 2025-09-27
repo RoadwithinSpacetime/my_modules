@@ -20,18 +20,17 @@ private:
     // --- Pins ---
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;              // Compressor CV (0–1)
-    AudioOutPin pinMaxInputCycle_;   // Peak of *input* cycle
-    AudioOutPin pinMaxDelayedCycle_; // Same peak but delayed
-    FloatInPin  pinThreshold_;
-    FloatInPin  pinRatio_;
+    AudioOutPin pinCV_;             // Compressor-style CV
+    AudioOutPin pinMaxInputCycle_;  // Smoothed max peak of input cycle
+    AudioOutPin pinMaxDelayedCycle_;// Smoothed max peak of delayed cycle
+    FloatInPin  pinThreshold_;      // Threshold (0.0–1.0 mapped to 0–10 V)
+    FloatInPin  pinRatio_;          // Ratio (1:1 .. 20:1)
 
     // --- Buffers ---
     std::vector<float> lookaheadBuffer_;
     std::vector<float> cvBuffer_;
-    std::vector<float> delayedPeakBuffer_; // delay line for maxDelayedCycle
     int bufferWritePos_;
-    int lookaheadSamples_;           // ~30 ms delay
+    int lookaheadSamples_; // ~30 ms in samples
 
     // --- Cycle tracking ---
     float lastSample_;
@@ -41,8 +40,17 @@ private:
     int   lastPositiveWidth_;
     int   minCycleGuard_;
 
-    // --- Held values ---
-    float maxInputCycle_;            // latched each input cycle end
+    // --- Peak smoothing (input cycle) ---
+    float prevPeakSmoothIn_;
+    float nextPeakSmoothIn_;
+    int   rampSamplesTotalIn_;
+    int   rampSamplesRemainingIn_;
+
+    // --- Peak smoothing (delayed cycle) ---
+    float prevPeakSmoothDelay_;
+    float nextPeakSmoothDelay_;
+    int   rampSamplesTotalDelay_;
+    int   rampSamplesRemainingDelay_;
 
     // --- Misc ---
     double sampleRate_;
