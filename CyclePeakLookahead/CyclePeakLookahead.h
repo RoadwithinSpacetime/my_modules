@@ -1,8 +1,7 @@
 #pragma once
 #include "mp_sdk_audio.h"
-#include <cmath>
 #include <vector>
-#include <algorithm>
+#include <cmath>
 
 using namespace gmpi;
 
@@ -20,38 +19,33 @@ private:
     // --- Pins ---
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    AudioOutPin pinCV_;             // Compressor-style CV
-    AudioOutPin pinMaxInputCycle_;  // Smoothed max peak of input cycle
-    AudioOutPin pinMaxDelayedCycle_;// Smoothed max peak of delayed cycle
-    FloatInPin  pinThreshold_;      // Threshold (0.0–1.0 mapped to 0–10 V)
+    AudioOutPin pinCV_;             // compressed CV
+    AudioOutPin pinMaxInputCycle_;  // max peak of current input cycle
+    AudioOutPin pinMaxDelayedCycle_;// max peak of delayed cycle
+    FloatInPin  pinThreshold_;      // Threshold (0–1 mapped to 0–10 V)
     FloatInPin  pinRatio_;          // Ratio (1:1 .. 20:1)
+    FloatInPin  pinAttack_;         // (unused but kept for compatibility)
+    FloatInPin  pinRelease_;        // (unused but kept for compatibility)
 
     // --- Buffers ---
     std::vector<float> lookaheadBuffer_;
     std::vector<float> cvBuffer_;
-    int bufferWritePos_;
-    int lookaheadSamples_; // ~30 ms in samples
+    std::vector<float> maxBuffer_;  // stores cycle max for delayed output
+    int bufferWritePos_ = 0;
+    int lookaheadSamples_ = 0; // 30 ms in samples
 
     // --- Cycle tracking ---
-    float lastSample_;
-    float cyclePeak_;
-    float previousCyclePeak_;
-    int   samplesSinceCycleStart_;
-    int   lastPositiveWidth_;
-    int   minCycleGuard_;
+    float lastSample_ = 0.0f;
+    float cyclePeak_ = 0.0f;
+    float previousCyclePeak_ = 0.0f;
+    int   samplesSinceCycleStart_ = 0;
+    int   lastPositiveWidth_ = 0;
+    int   minCycleGuard_ = 0;
 
-    // --- Peak smoothing (input cycle) ---
-    float prevPeakSmoothIn_;
-    float nextPeakSmoothIn_;
-    int   rampSamplesTotalIn_;
-    int   rampSamplesRemainingIn_;
-
-    // --- Peak smoothing (delayed cycle) ---
-    float prevPeakSmoothDelay_;
-    float nextPeakSmoothDelay_;
-    int   rampSamplesTotalDelay_;
-    int   rampSamplesRemainingDelay_;
+    // --- Delayed cycle max ---
+    float inputCyclePeakHold_ = 0.0f; // live input-cycle max
+    float delayedCyclePeakHold_ = 0.0f; // delayed-cycle max
 
     // --- Misc ---
-    double sampleRate_;
+    double sampleRate_ = 0.0;
 };
