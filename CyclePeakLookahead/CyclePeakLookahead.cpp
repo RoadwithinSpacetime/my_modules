@@ -1,8 +1,8 @@
 #include "CyclePeakLookahead.h"
 #include <cstring>   // memset
-#include <algorithm> // std::max, std::clamp
+#include <algorithm> // std::max, std::min
 #undef max
-#undef min  // protect against Windows macros
+#undef min
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -24,6 +24,8 @@ CyclePeakLookahead::CyclePeakLookahead()
     initializePin(pinIn_);
     initializePin(pinOut_);
     initializePin(pinCV_);
+    initializePin(pinMaxInputCycle_);   // NEW
+    initializePin(pinMaxDelayedCycle_); // NEW
     initializePin(pinThreshold_);
     initializePin(pinRatio_);
     initializePin(pinAttack_);
@@ -39,10 +41,10 @@ int32_t CyclePeakLookahead::open()
     previousCyclePeak_ = 0.0f;
     samplesSinceCycleStart_ = 0;
 
-    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // default 10 ms
+    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_);
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
-    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);  // 30 ms
+    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
     if (lookaheadSamples_ < 1) lookaheadSamples_ = 1;
 
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
@@ -52,6 +54,8 @@ int32_t CyclePeakLookahead::open()
     setSubProcess(&CyclePeakLookahead::subProcess);
     pinOut_.setStreaming(true);
     pinCV_.setStreaming(true);
+    pinMaxInputCycle_.setStreaming(true);   // NEW
+    pinMaxDelayedCycle_.setStreaming(true); // NEW
 
     return MpBase2::open();
 }
@@ -60,6 +64,8 @@ void CyclePeakLookahead::onSetPins()
 {
     pinOut_.setStreaming(true);
     pinCV_.setStreaming(true);
+    pinMaxInputCycle_.setStreaming(true);   // NEW
+    pinMaxDelayedCycle_.setStreaming(true); // NEW
     setSubProcess(&CyclePeakLookahead::subProcess);
 }
 
@@ -71,14 +77,20 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
         setSubProcess(&CyclePeakLookahead::subProcess);
         pinOut_.setStreaming(true);
         pinCV_.setStreaming(true);
+        pinMaxInputCycle_.setStreaming(true);
+        pinMaxDelayedCycle_.setStreaming(true);
         subProcess(sampleFrames);
         return;
     }
 
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
-    if (out)   memset(out, 0, sampleFrames * sizeof(float));
-    if (cvOut) memset(cvOut, 0, sampleFrames * sizeof(float));
+    float* maxInOut = getBuffer(pinMaxInputCycle_);
+    float* maxDelayedOut = getBuffer(pinMaxDelayedCycle_);
+    if (out)           memset(out, 0, sampleFrames * sizeof(float));
+    if (cvOut)         memset(cvOut, 0, sampleFrames * sizeof(float));
+    if (maxInOut)      memset(maxInOut, 0, sampleFrames * sizeof(float));
+    if (maxDelayedOut) memset(maxDelayedOut, 0, sampleFrames * sizeof(float));
 }
 
 void CyclePeakLookahead::subProcess(int sampleFrames)
@@ -86,20 +98,23 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     float* in = getBuffer(pinIn_);
     float* out = getBuffer(pinOut_);
     float* cvOut = getBuffer(pinCV_);
-    if (!in || !out || !cvOut) return;
+    float* maxInOut = getBuffer(pinMaxInputCycle_);
+    float* maxDelayedOut = getBuffer(pinMaxDelayedCycle_);
+    if (!in || !out || !cvOut || !maxInOut || !maxDelayedOut) return;
 
-    float threshold = pinThreshold_ * 0.1f; // 0–1 to 0–10 V
+    float threshold = pinThreshold_ * 0.1f;
     float ratio = pinRatio_;
     ratio = (std::max)(1.0f, (std::min)(20.0f, ratio));
 
     const int N = lookaheadSamples_;
+    float currentInputPeak = 0.0f;   // NEW: track input cycle peak
+    float currentDelayedPeak = 0.0f; // NEW: track delayed output peak
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // --- Zero-cross detection ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -121,7 +136,6 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                     cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
                 }
 
-                // --- Ceil & Floor quantisation (1 decimal) ---
                 if (quantStep_ > 0.0f)
                 {
                     if (useCeil_)
@@ -131,7 +145,6 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                     cvValue = (std::max)(0.0f, (std::min)(1.0f, cvValue));
                 }
 
-                // backfill CV buffer for the just-finished cycle
                 int fillCount = cycleLength;
                 if (fillCount > N) fillCount = N;
                 for (int i = 1; i <= fillCount; ++i)
@@ -154,14 +167,23 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         if (valueForPeak > cyclePeak_)
             cyclePeak_ = valueForPeak;
 
-        lastSample_ = x;
+        if (valueForPeak > currentInputPeak)   // track current input peak
+            currentInputPeak = valueForPeak;
 
-        // --- Write audio and delayed CV ---
+        lastSample_ = x;
         lookaheadBuffer_[bufferWritePos_] = x;
 
         int readPos = (bufferWritePos_ + 1) % N;
-        out[s] = lookaheadBuffer_[readPos];
+        float delayedSample = lookaheadBuffer_[readPos];
+        out[s] = delayedSample;
         cvOut[s] = cvBuffer_[readPos];
+
+        float delayedAbs = std::fabs(delayedSample);
+        if (delayedAbs > currentDelayedPeak)
+            currentDelayedPeak = delayedAbs;
+
+        maxInOut[s] = currentInputPeak;       // output live peaks
+        maxDelayedOut[s] = currentDelayedPeak;
 
         bufferWritePos_ = (bufferWritePos_ + 1) % N;
     }

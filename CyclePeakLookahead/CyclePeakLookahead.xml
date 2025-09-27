@@ -9,6 +9,10 @@
 			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
 			<Pin name="CV" datatype="float" direction="out" rate="audio"/>
 
+			<!-- NEW cycle-peak outputs -->
+			<Pin name="maxInputCycle" datatype="float" direction="out" rate="audio"/>
+			<Pin name="maxDelayedCycle" datatype="float" direction="out" rate="audio"/>
+
 			<!-- Control pins -->
 			<Pin name="Threshold" datatype="float" direction="in" rate="control" default="0.5"/>
 			<Pin name="Ratio" datatype="float" direction="in" rate="control" default="1.0"/>
