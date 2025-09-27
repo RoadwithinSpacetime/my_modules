@@ -1,4 +1,3 @@
-#define FULL_WAVE_PEAK
 #include "CyclePeakLookahead.h"
 #include <cstring>
 #undef max
@@ -19,7 +18,7 @@ CyclePeakLookahead::CyclePeakLookahead()
     , samplesSinceCycleStart_(0)
     , lastPositiveWidth_(0)
     , minCycleGuard_(0)
-    , inputCyclePeakHold_(0.0f)
+    , maxInputCycle_(0.0f)
     , sampleRate_(0.0)
 {
     initializePin(pinIn_);
@@ -38,18 +37,18 @@ int32_t CyclePeakLookahead::open()
     lastSample_ = 0.0f;
     cyclePeak_ = 0.0f;
     previousCyclePeak_ = 0.0f;
-    inputCyclePeakHold_ = 0.0f;
+    maxInputCycle_ = 0.0f;
     samplesSinceCycleStart_ = 0;
 
-    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_); // ~10 ms default
+    lastPositiveWidth_ = static_cast<int>(0.01 * sampleRate_);
     minCycleGuard_ = lastPositiveWidth_ / 4;
 
-    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);   // ~30 ms
+    lookaheadSamples_ = static_cast<int>(0.03 * sampleRate_);
     if (lookaheadSamples_ < 1) lookaheadSamples_ = 1;
 
     lookaheadBuffer_.assign(lookaheadSamples_, 0.0f);
     cvBuffer_.assign(lookaheadSamples_, 1.0f);
-    peakHoldBuffer_.assign(lookaheadSamples_, 0.0f);
+    delayedPeakBuffer_.assign(lookaheadSamples_, 0.0f);
     bufferWritePos_ = 0;
 
     setSubProcess(&CyclePeakLookahead::subProcess);
@@ -76,10 +75,10 @@ void CyclePeakLookahead::subProcessSilent(int sampleFrames)
     float* cvOut = getBuffer(pinCV_);
     float* maxInOut = getBuffer(pinMaxInputCycle_);
     float* maxDelOut = getBuffer(pinMaxDelayedCycle_);
-    if (out)      std::memset(out, 0, sampleFrames * sizeof(float));
-    if (cvOut)    std::memset(cvOut, 0, sampleFrames * sizeof(float));
-    if (maxInOut) std::memset(maxInOut, 0, sampleFrames * sizeof(float));
-    if (maxDelOut)std::memset(maxDelOut, 0, sampleFrames * sizeof(float));
+    if (out)       std::memset(out, 0, sampleFrames * sizeof(float));
+    if (cvOut)     std::memset(cvOut, 0, sampleFrames * sizeof(float));
+    if (maxInOut)  std::memset(maxInOut, 0, sampleFrames * sizeof(float));
+    if (maxDelOut) std::memset(maxDelOut, 0, sampleFrames * sizeof(float));
 }
 
 void CyclePeakLookahead::subProcess(int sampleFrames)
@@ -92,9 +91,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
     if (!in || !out || !cvOut || !maxInOut || !maxDelOut) return;
 
     float threshold = pinThreshold_ * 0.1f; // 0–1 => 0–10V
-    float ratio = pinRatio_;
-    ratio = std::max(1.0f, std::min(20.0f, ratio));
-
+    float ratio = std::clamp((float)pinRatio_, 1.0f, 20.0f);
     const int N = lookaheadSamples_;
 
     for (int s = 0; s < sampleFrames; ++s)
@@ -102,7 +99,7 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         float x = in[s];
         samplesSinceCycleStart_++;
 
-        // Zero-cross detection (start of positive half-cycle)
+        // --- Zero-cross detection (positive going) ---
         if (lastSample_ <= 0.0f && x > 0.0f)
         {
             if (samplesSinceCycleStart_ > minCycleGuard_)
@@ -111,32 +108,29 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
                 lastPositiveWidth_ = cycleLength;
                 minCycleGuard_ = lastPositiveWidth_ / 4;
 
-                // --- store peaks ---
                 previousCyclePeak_ = cyclePeak_;
-                inputCyclePeakHold_ = cyclePeak_; // hold for MaxInputCycle pin
+                maxInputCycle_ = cyclePeak_; // latch true input cycle peak
                 cyclePeak_ = 0.0f;
 
-                // compute compressor CV
+                // Compressor CV
                 float cvValue = 1.0f;
                 if (previousCyclePeak_ > 0.0f)
                 {
-                    float over = previousCyclePeak_ - threshold;
-                    if (over < 0.0f) over = 0.0f;
+                    float over = std::max(0.0f, previousCyclePeak_ - threshold);
                     float compressedPeak = threshold + over / ratio;
-                    cvValue = compressedPeak / previousCyclePeak_;
-                    cvValue = std::clamp(cvValue, 0.0f, 1.0f);
+                    cvValue = std::clamp(compressedPeak / previousCyclePeak_, 0.0f, 1.0f);
                 }
 
-                // fill CV buffer and peak hold buffer for lookahead alignment
-                int fillCount = cycleLength;
-                if (fillCount > N) fillCount = N;
+                // Backfill lookahead buffers
+                int fillCount = std::min(cycleLength, N);
                 for (int i = 1; i <= fillCount; ++i)
                 {
                     int idx = bufferWritePos_ - i;
                     idx %= N;
                     if (idx < 0) idx += N;
+
                     cvBuffer_[idx] = cvValue;
-                    peakHoldBuffer_[idx] = inputCyclePeakHold_;
+                    delayedPeakBuffer_[idx] = maxInputCycle_; // delayed copy
                 }
 
                 samplesSinceCycleStart_ = 0;
@@ -144,31 +138,30 @@ void CyclePeakLookahead::subProcess(int sampleFrames)
         }
 
 #ifdef FULL_WAVE_PEAK
-        float valueForPeak = std::fabs(x);
+        float v = std::fabs(x);
 #else
-        float valueForPeak = x;
+        float v = x;
 #endif
-        if (valueForPeak > cyclePeak_)
-            cyclePeak_ = valueForPeak;
+        if (v > cyclePeak_)
+            cyclePeak_ = v;
 
         lastSample_ = x;
 
-        // lookahead delay readout
+        // --- Lookahead read ---
         lookaheadBuffer_[bufferWritePos_] = x;
-
         int readPos = (bufferWritePos_ + 1) % N;
+
         out[s] = lookaheadBuffer_[readPos];
         cvOut[s] = cvBuffer_[readPos];
-        maxInOut[s] = inputCyclePeakHold_;
-        maxDelOut[s] = peakHoldBuffer_[readPos];
+        maxInOut[s] = maxInputCycle_;           // immediate peak
+        maxDelOut[s] = delayedPeakBuffer_[readPos]; // delayed peak
 
         bufferWritePos_ = (bufferWritePos_ + 1) % N;
     }
 }
 
-// Register plugin with SE
+// Register plugin
 namespace
 {
     auto r = Register<CyclePeakLookahead>::withId(L"CyclePeakLookahead_SE");
 }
-
