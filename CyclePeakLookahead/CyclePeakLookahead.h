@@ -24,8 +24,6 @@ private:
     AudioOutPin pinMaxDelayedCycle_;// max peak of delayed cycle
     FloatInPin  pinThreshold_;      // Threshold (0–1 mapped to 0–10 V)
     FloatInPin  pinRatio_;          // Ratio (1:1 .. 20:1)
-    FloatInPin  pinAttack_;         // (unused but kept for compatibility)
-    FloatInPin  pinRelease_;        // (unused but kept for compatibility)
 
     // --- Buffers ---
     std::vector<float> lookaheadBuffer_;
@@ -42,10 +40,11 @@ private:
     int   lastPositiveWidth_ = 0;
     int   minCycleGuard_ = 0;
 
-    // --- Delayed cycle max ---
-    float inputCyclePeakHold_ = 0.0f; // live input-cycle max
+    // --- Peak holds ---
+    float inputCyclePeakHold_ = 0.0f;   // live input-cycle max
     float delayedCyclePeakHold_ = 0.0f; // delayed-cycle max
 
     // --- Misc ---
     double sampleRate_ = 0.0;
+    bool   quantizeToInt_ = true;       // switch for integer quantisation
 };

@@ -1,19 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="CyclePeakLookahead_SE" name="CyclePeakLookahead" category="RwS Modules">
-		<Description>Cycle peak detection with CV output (0–10 V compressor-style)</Description>
+		<Description>Cycle peak detection with CV output (0–10 V compressor-style) plus integer quantised max-cycle outputs.</Description>
 
 		<Audio>
-			<!-- Audio pins -->
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
 			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
 			<Pin name="CV" datatype="float" direction="out" rate="audio"/>
+			<Pin name="MaxInputCycle" datatype="float" direction="out" rate="audio"/>
+			<Pin name="MaxDelayedCycle" datatype="float" direction="out" rate="audio"/>
 
-			<!-- NEW cycle-peak outputs -->
-			<Pin name="maxInputCycle" datatype="float" direction="out" rate="audio"/>
-			<Pin name="maxDelayedCycle" datatype="float" direction="out" rate="audio"/>
-
-			<!-- Control pins -->
 			<Pin name="Threshold" datatype="float" direction="in" rate="control" default="0.5"/>
 			<Pin name="Ratio" datatype="float" direction="in" rate="control" default="1.0"/>
 		</Audio>
