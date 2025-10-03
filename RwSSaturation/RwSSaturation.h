@@ -3,6 +3,10 @@
 #include <cmath>
 #include <algorithm>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 using namespace gmpi;
 
 class RwSSaturation : public MpBase2
@@ -15,22 +19,20 @@ public:
     void subProcess(int sampleFrames);
 
 private:
-    // Pins
+    // --- Pins ---
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
+    FloatInPin  pinDrive_; // Drive amount
+    FloatInPin  pinMix_;   // Dry/Wet mix
 
-    FloatInPin  pinDrive_;   // Input gain / steepness
-    FloatInPin  pinMix_;     // Dry/Wet (0..1)
+    // --- State ---
+    float state_ = 0.0f;     // hysteresis state
+    float hyst_ = 0.02f;     // hysteresis smoothing
+    float lpState_ = 0.0f;   // lowpass state (for cubic term)
+    float lpCoeff_ = 0.0f;   // lowpass coefficient
+    float alphaBase_ = 0.5f; // cubic weighting
 
-    // --- Waveshaper ---
-    float alphaBase_ = 0.5f;  // base steepness for cubic
-    float hyst_ = 0.02f;      // hysteresis (0 = off)
-    float state_ = 0.0f;      // memory state
-
-    // --- Anti-alias lowpass (one-pole ~4 kHz) ---
-    float lpState_ = 0.0f;
-    float lpCoeff_ = 0.0f;
-
-    inline float waveshape(float in, float alpha);
-    inline float lowpass(float x);
+    // --- Helpers ---
+    float lowpass(float x);
+    float waveshape(float in, float alpha);
 };

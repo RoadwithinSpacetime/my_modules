@@ -1,9 +1,6 @@
 #include "RwSSaturation.h"
-#include <cstring>   // memset
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+REGISTER_PLUGIN(RwSSaturation, "RwSSaturation");
 
 RwSSaturation::RwSSaturation()
 {
@@ -15,43 +12,40 @@ RwSSaturation::RwSSaturation()
 
 int32_t RwSSaturation::open()
 {
-    state_ = 0.0f;
-    lpState_ = 0.0f;
+    MpBase2::open();
 
-    // Low-pass coeff for 4 kHz cutoff
-    float sr = getSampleRate();
-    float fc = 4000.0f;
-    float x = expf(-2.0f * static_cast<float>(M_PI) * fc / sr);
-    lpCoeff_ = 1.0f - x;
+    // 4 kHz lowpass for cubic term
+    double sampleRate = getSampleRate();
+    double cutoff = 4000.0;
+    lpCoeff_ = 1.0 - std::exp(-2.0 * M_PI * cutoff / sampleRate);
 
-    setSubProcess(&RwSSaturation::subProcess);
-    pinOut_.setStreaming(true);
-
-    return MpBase2::open();
+    return gmpi::MP_OK;
 }
 
 void RwSSaturation::onSetPins()
 {
-    bool streaming = pinIn_.isStreaming();
-    pinOut_.setStreaming(streaming);
-
-    if (streaming)
-        setSubProcess(&RwSSaturation::subProcess);
-    else
-        setSubProcess(nullptr);
+    setSubProcess(&RwSSaturation::subProcess);
+    pinOut_.setStreaming(true);
 }
 
-// cubic waveshaper: x + a * x3
-inline float RwSSaturation::waveshape(float in, float alpha)
-{
-    return in + alpha * in * in * in;
-}
-
-// simple one-pole LPF
-inline float RwSSaturation::lowpass(float x)
+float RwSSaturation::lowpass(float x)
 {
     lpState_ += lpCoeff_ * (x - lpState_);
+    if (!std::isfinite(lpState_)) lpState_ = 0.0f;
     return lpState_;
+}
+
+float RwSSaturation::waveshape(float in, float alpha)
+{
+    // Linear path
+    float lin = in;
+
+    // Cubic path with lowpass smoothing
+    float cubic = in * in * in;
+    cubic = lowpass(cubic);
+
+    // Combine
+    return lin + alpha * cubic;
 }
 
 void RwSSaturation::subProcess(int sampleFrames)
@@ -61,36 +55,28 @@ void RwSSaturation::subProcess(int sampleFrames)
     if (!inBuf || !outBuf)
         return;
 
-    float drive = (std::max)(0.01f, pinDrive_.getValue());
+    float drive = std::clamp(pinDrive_.getValue(), 0.01f, 20.0f);
     float mix = std::clamp(pinMix_.getValue(), 0.0f, 1.0f);
-
-    // Map drive to alpha steepness
     float alpha = alphaBase_ * drive;
 
     for (int i = 0; i < sampleFrames; ++i)
     {
         float dry = inBuf[i];
 
-        // Apply drive pre-gain
+        // Apply drive
         float driven = dry * drive;
+        driven = std::clamp(driven, -5.0f, 5.0f);
 
-        // Apply cubic waveshaper
+        // Waveshaper with LP on cubic term
         float shaped = waveshape(driven, alpha);
 
-        // Apply hysteresis (magnetic smoothing)
+        // Hysteresis smoothing
         state_ += hyst_ * (shaped - state_);
+        if (!std::isfinite(state_)) state_ = 0.0f;
+
         float wet = state_;
 
-        // Apply low-pass filter
-        wet = lowpass(wet);
-
-        // Mix dry/wet
+        // Dry/wet mix
         outBuf[i] = dry * (1.0f - mix) + wet * mix;
     }
-}
-
-// Register plugin
-namespace
-{
-    auto r = Register<RwSSaturation>::withId(L"RwSSaturation");
 }
