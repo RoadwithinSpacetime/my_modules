@@ -1,6 +1,9 @@
 #include "RwSSaturation.h"
+#include <cstring>
+#include <algorithm>
 
-REGISTER_PLUGIN(RwSSaturation, "RwSSaturation");
+#undef max
+#undef min  // Fix Windows macros messing with std::max/std::min
 
 RwSSaturation::RwSSaturation()
 {
@@ -8,18 +11,25 @@ RwSSaturation::RwSSaturation()
     initializePin(pinOut_);
     initializePin(pinDrive_);
     initializePin(pinMix_);
+    initializePin(pinAlpha_);
+    initializePin(pinHyst_);
 }
 
 int32_t RwSSaturation::open()
 {
-    MpBase2::open();
+    sampleRate_ = getSampleRate();
 
-    // 4 kHz lowpass for cubic term
-    double sampleRate = getSampleRate();
+    // Simple 1-pole LPF at 4 kHz
     double cutoff = 4000.0;
-    lpCoeff_ = 1.0 - std::exp(-2.0 * M_PI * cutoff / sampleRate);
+    double x = exp(-2.0 * M_PI * cutoff / sampleRate_);
+    lp_a0_ = 1.0f - (float)x;
+    lp_b1_ = (float)x;
+    lp_z1_ = 0.0f;
 
-    return gmpi::MP_OK;
+    setSubProcess(&RwSSaturation::subProcess);
+    pinOut_.setStreaming(true);
+
+    return MpBase2::open();
 }
 
 void RwSSaturation::onSetPins()
@@ -28,55 +38,51 @@ void RwSSaturation::onSetPins()
     pinOut_.setStreaming(true);
 }
 
-float RwSSaturation::lowpass(float x)
+void RwSSaturation::subProcessSilent(int sampleFrames)
 {
-    lpState_ += lpCoeff_ * (x - lpState_);
-    if (!std::isfinite(lpState_)) lpState_ = 0.0f;
-    return lpState_;
-}
-
-float RwSSaturation::waveshape(float in, float alpha)
-{
-    // Linear path
-    float lin = in;
-
-    // Cubic path with lowpass smoothing
-    float cubic = in * in * in;
-    cubic = lowpass(cubic);
-
-    // Combine
-    return lin + alpha * cubic;
+    float* out = getBuffer(pinOut_);
+    if (out)
+    {
+        memset(out, 0, sampleFrames * sizeof(float));
+    }
 }
 
 void RwSSaturation::subProcess(int sampleFrames)
 {
-    float* inBuf = getBuffer(pinIn_);
-    float* outBuf = getBuffer(pinOut_);
-    if (!inBuf || !outBuf)
-        return;
+    const float* in = getBuffer(pinIn_);
+    float* out = getBuffer(pinOut_);
 
-    float drive = std::clamp(pinDrive_.getValue(), 0.01f, 20.0f);
-    float mix = std::clamp(pinMix_.getValue(), 0.0f, 1.0f);
-    float alpha = alphaBase_ * drive;
+    if (!in || !out) return;
 
-    for (int i = 0; i < sampleFrames; ++i)
+    float drive = (std::max)(0.0f, pinDrive_.getValue());
+    float mix = (std::clamp)(pinMix_.getValue(), 0.0f, 1.0f);
+    float alpha = pinAlpha_.getValue();
+    float hyst = pinHyst_.getValue();
+
+    for (int s = 0; s < sampleFrames; ++s)
     {
-        float dry = inBuf[i];
-
         // Apply drive
-        float driven = dry * drive;
-        driven = std::clamp(driven, -5.0f, 5.0f);
+        float x = in[s] * drive;
 
-        // Waveshaper with LP on cubic term
-        float shaped = waveshape(driven, alpha);
+        // Lowpass filter before cubic
+        lp_z1_ = lp_a0_ * x + lp_b1_ * lp_z1_;
+        float filtered = lp_z1_;
 
-        // Hysteresis smoothing
-        state_ += hyst_ * (shaped - state_);
-        if (!std::isfinite(state_)) state_ = 0.0f;
+        // Cubic waveshaper: x + a * x3
+        float shaped = filtered + alpha * (filtered * filtered * filtered);
 
-        float wet = state_;
+        // Hysteresis smoothing (simple one-pole)
+        hystState_ += hyst * (shaped - hystState_);
+        float saturated = hystState_;
 
-        // Dry/wet mix
-        outBuf[i] = dry * (1.0f - mix) + wet * mix;
+        // Dry/Wet mix
+        out[s] = (1.0f - mix) * in[s] + mix * saturated;
     }
+}
+
+
+// Register with SynthEdit
+namespace
+{
+    auto r = Register<RwSSaturation>::withId(L"RwSSaturation");
 }
