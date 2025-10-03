@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PluginList>
+	<Plugin id="RwSSaturation" name="RwS Saturation" category="RwS Modules">
+		<Description>
+			Magnetic-style saturator: soft B–H loop curve with hysteresis. Produces warm 2nd and 3rd harmonics, avoids harsh 5th/7th.
+		</Description>
+
+		<Audio>
+			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
+			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
+
+			<Pin name="Drive" datatype="float" direction="in" rate="control" default="1.0"/>
+			<Pin name="Mix" datatype="float" direction="in" rate="control" default="1.0"/>
+		</Audio>
+
+		<Vendor>Road_within_Spacetime</Vendor>
+	</Plugin>
+</PluginList>
