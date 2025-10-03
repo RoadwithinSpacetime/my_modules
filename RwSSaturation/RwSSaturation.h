@@ -1,6 +1,7 @@
 #pragma once
 #include "mp_sdk_audio.h"
 #include <cmath>
+#include <algorithm>
 
 using namespace gmpi;
 
@@ -14,30 +15,22 @@ public:
     void subProcess(int sampleFrames);
 
 private:
-    // --- Pins ---
+    // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
 
-    FloatInPin pinDrive_;     // Input gain
-    FloatInPin pinMix_;       // Dry/Wet
+    FloatInPin  pinDrive_;   // Input gain / steepness
+    FloatInPin  pinMix_;     // Dry/Wet (0..1)
 
-    // --- Saturation state ---
-    float Bsat_ = 1.0f;    // saturation limit
-    float alpha_ = 2.0f;   // curve steepness
-    float hyst_ = 0.02f;   // hysteresis blend
-    float state_ = 0.0f;   // memory state
+    // --- Waveshaper ---
+    float alphaBase_ = 0.5f;  // base steepness for cubic
+    float hyst_ = 0.02f;      // hysteresis (0 = off)
+    float state_ = 0.0f;      // memory state
 
-    inline float saturate(float x)
-    {
-        // Apply drive
-        float H = x * alpha_;
+    // --- Anti-alias lowpass (one-pole ~4 kHz) ---
+    float lpState_ = 0.0f;
+    float lpCoeff_ = 0.0f;
 
-        // Magnetization curve (tanh is smooth, keeps only low harmonics)
-        float target = std::tanh(H) * Bsat_;
-
-        // Apply hysteresis smoothing (like magnetic memory)
-        state_ += hyst_ * (target - state_);
-
-        return state_;
-    }
+    inline float waveshape(float in, float alpha);
+    inline float lowpass(float x);
 };
