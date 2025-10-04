@@ -102,8 +102,8 @@ void RwSSaturation::subProcess(int sampleFrames)
 
         // Normalize harmonic contributions (prevent overpowering linear path)
         // Adjust constants as needed for musical scaling
-        float harmonic2 = beta * 0.25f * x2f;  // 2nd harmonic, normalized
-        float harmonic3 = alpha * 0.10f * x3f;  // 3rd harmonic, normalized
+        float harmonic2 = alpha * 0.10f * x2f;  // 2nd harmonic, normalized
+        float harmonic3 = beta * 0.25f * x3f;  // 3rd harmonic, normalized
 
         // Combine with linear
         float shaped = x - harmonic2 - harmonic3;
