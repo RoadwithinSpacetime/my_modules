@@ -32,7 +32,7 @@ private:
     FloatInPin  pinKnee_;      // knee width (linear units)
     FloatInPin  pinHyst_;      // hysteresis smoothing 0..1
 
-    // GSinc FIR (9 taps) for LP on harmonic products
+    // GSinc FIR (9 taps sinc) for LP on harmonic products
     std::vector<float> gsincCoeffs_;
     const int gsincTaps_ = 9;
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
-		<Description>Transformer/B–H inspired saturation: linear + α·LP(2nd) + β·LP(3rd), 9-tap gsinc @4kHz, soft threshold knee and hysteresis smoothing.</Description>
+		<Description>Transformer/B–H saturation: linear + α·LP(2nd) + β·LP(3rd), 9-tap gsinc @4kHz, soft threshold knee and hysteresis smoothing.</Description>
 
 		<Audio>
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>

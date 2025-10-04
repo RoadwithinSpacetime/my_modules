@@ -38,7 +38,7 @@ std::vector<float> RwSSaturation::make_gsinc_coeffs(int taps, double sampleRate,
     return h;
 }
 
-// circular-buffer FIR convolution (coeffs length == buffer length)
+// circular-buffer FIR convolution (coeffs length = buffer length)
 inline float RwSSaturation::fir_filter(const std::vector<float>& buf, int pos, const std::vector<float>& coeffs)
 {
     const int N = static_cast<int>(coeffs.size());
