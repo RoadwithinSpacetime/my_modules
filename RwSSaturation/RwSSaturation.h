@@ -2,7 +2,6 @@
 #include "mp_sdk_audio.h"
 #include <vector>
 #include <cmath>
-#include <algorithm>
 #include <cstring>
 
 #ifndef M_PI
@@ -16,42 +15,41 @@ class RwSSaturation : public MpBase2
 public:
     RwSSaturation();
 
-    int32_t open() override; // this one is correct
-    void onSetPins();        // remove 'override'
-    void subProcess(int sampleFrames); // remove 'override'
-    void subProcessSilent(int sampleFrames); // remove 'override'
+    int32_t open() override;
+    void onSetPins() override;
+    void subProcess(int sampleFrames);
+    void subProcessSilent(int sampleFrames);
 
 private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    FloatInPin  pinDrive_;
-    FloatInPin  pinMix_;
-    FloatInPin  pinAlpha_;
-    FloatInPin  pinBeta_;
-    FloatInPin  pinHyst_;
+    FloatInPin  pinDrive_;  // input drive
+    FloatInPin  pinMix_;    // dry/wet mix
+    FloatInPin  pinAlpha_;  // 3rd harmonic strength
+    FloatInPin  pinBeta_;   // 2nd harmonic strength
+    FloatInPin  pinHyst_;   // hysteresis amount
 
-    // FIR filter (shared for harmonics)
+    // FIR (shared 9-tap GSinc lowpass)
+    void makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs);
+    float firProcess(std::vector<float>& buf, int pos, const std::vector<float>& coeffs, float input);
+
     std::vector<float> firCoeffs_;
     std::vector<float> x2Buf_;
     std::vector<float> x3Buf_;
+    int firTaps_ = 9;
     int firPos_ = 0;
-    int firTaps_ = 31;
 
-    // DC removal
+    // DC removal for even harmonic
     float x2_dc_ = 0.0f;
     float x2_dc_alpha_ = 0.0f;
 
-    // Hysteresis
+    // Hysteresis state
     float hystState_ = 0.0f;
 
-    // Scaling constants
-    float betaScale_ = 0.5f;
-    float alphaScale_ = 0.15f;
+    // Constants
+    const float betaScale_ = 0.25f; // 2nd harmonic normalization
+    const float alphaScale_ = 0.15f; // 3rd harmonic normalization
 
     double sampleRate_ = 44100.0;
-
-    // Helpers
-    void makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs);
-    inline float firProcess(std::vector<float>& buf, int pos, const std::vector<float>& coeffs, float input);
 };
