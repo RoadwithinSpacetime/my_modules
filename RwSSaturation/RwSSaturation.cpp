@@ -1,18 +1,16 @@
 #include "RwSSaturation.h"
-#include <cstring>   // memset
-#include <numeric>   // accumulate
-#include <algorithm>
+#include <cstring>
 
 #undef max
 #undef min
 
-// Build windowed sinc (Hamming window) normalized to unity DC.
-// taps must be odd (9).
+// Build windowed sinc (Hamming window), normalized to DC = 1
 std::vector<float> RwSSaturation::make_gsinc_coeffs(int taps, double sampleRate, double cutoffHz)
 {
     std::vector<float> h(taps);
     const int mid = (taps - 1) / 2;
-    const double fc = cutoffHz / sampleRate; // normalized frequency (0..0.5)
+    const double fc = cutoffHz / sampleRate;
+
     for (int n = 0; n < taps; ++n)
     {
         int k = n - mid;
@@ -24,11 +22,11 @@ std::vector<float> RwSSaturation::make_gsinc_coeffs(int taps, double sampleRate,
             double x = 2.0 * M_PI * fc * k;
             sinc = std::sin(x) / (M_PI * k);
         }
-        // Hamming window
         double w = 0.54 - 0.46 * std::cos(2.0 * M_PI * n / (taps - 1));
         h[n] = static_cast<float>(sinc * w);
     }
-    // normalize DC gain = 1
+
+    // normalize
     double sum = 0.0;
     for (auto v : h) sum += v;
     if (sum != 0.0)
@@ -38,7 +36,7 @@ std::vector<float> RwSSaturation::make_gsinc_coeffs(int taps, double sampleRate,
     return h;
 }
 
-// circular-buffer FIR convolution (coeffs length = buffer length)
+// FIR convolution using circular buffer
 inline float RwSSaturation::fir_filter(const std::vector<float>& buf, int pos, const std::vector<float>& coeffs)
 {
     const int N = static_cast<int>(coeffs.size());
@@ -47,20 +45,9 @@ inline float RwSSaturation::fir_filter(const std::vector<float>& buf, int pos, c
     for (int k = 0; k < N; ++k)
     {
         acc += coeffs[k] * buf[idx];
-        // move backward circularly
         if (--idx < 0) idx += N;
     }
     return static_cast<float>(acc);
-}
-
-// Smooth cubic step smoothstep: 0..1 mapping with zero derivatives at ends.
-inline float RwSSaturation::smoothstep_cubic(float x)
-{
-    // clamp 0..1
-    if (x <= 0.0f) return 0.0f;
-    if (x >= 1.0f) return 1.0f;
-    // 3t^2 - 2t^3
-    return x * x * (3.0f - 2.0f * x);
 }
 
 RwSSaturation::RwSSaturation()
@@ -75,8 +62,6 @@ RwSSaturation::RwSSaturation()
     initializePin(pinMix_);
     initializePin(pinAlpha_);
     initializePin(pinBeta_);
-    initializePin(pinThreshold_);
-    initializePin(pinKnee_);
     initializePin(pinHyst_);
 }
 
@@ -85,13 +70,12 @@ int32_t RwSSaturation::open()
     sampleRate_ = getSampleRate();
     if (sampleRate_ <= 0.0) sampleRate_ = 44100.0;
 
-    const double cutoffHz = 4000.0; // LP cutoff for harmonic products
+    const double cutoffHz = 4000.0;
     gsincCoeffs_ = make_gsinc_coeffs(gsincTaps_, sampleRate_, cutoffHz);
 
     quadBuf_.assign(gsincTaps_, 0.0f);
     cubicBuf_.assign(gsincTaps_, 0.0f);
     quadPos_ = cubicPos_ = 0;
-
     hystState_ = 0.0f;
 
     setSubProcess(&RwSSaturation::subProcess);
@@ -119,7 +103,6 @@ void RwSSaturation::subProcessSilent(int sampleFrames)
     float* out = getBuffer(pinOut_);
     if (out) memset(out, 0, sampleFrames * sizeof(float));
 
-    // wake if audio reappears in same block
     float* in = getBuffer(pinIn_);
     if (in && pinIn_.isStreaming())
     {
@@ -135,13 +118,10 @@ void RwSSaturation::subProcess(int sampleFrames)
     float* outBuf = getBuffer(pinOut_);
     if (!inBuf || !outBuf) return;
 
-    // Read controls
     const float drive = std::clamp(pinDrive_.getValue(), 0.0f, 20.0f);
     const float mix = std::clamp(pinMix_.getValue(), 0.0f, 1.0f);
-    const float alphaBase = pinAlpha_.getValue(); // weight for 2nd-order (even)
-    const float betaBase = pinBeta_.getValue();  // weight for 3rd-order (odd)
-    const float threshold = std::clamp(pinThreshold_.getValue(), 0.0f, 5.0f); // linear threshold
-    const float knee = std::max(0.0001f, pinKnee_.getValue()); // knee width (avoid 0)
+    const float alpha = pinAlpha_.getValue(); // even harmonic
+    const float beta = pinBeta_.getValue();  // odd harmonic
     const float hyst = std::clamp(pinHyst_.getValue(), 0.0f, 1.0f);
 
     const int N = gsincTaps_;
@@ -151,88 +131,45 @@ void RwSSaturation::subProcess(int sampleFrames)
     {
         float input = inBuf[s];
 
-        // Pre-gain (drive)
+        // Pre-gain
         float driven = input * drive;
-        if (!std::isfinite(driven)) driven = 0.0f;
-        // clamp to avoid blow-ups
         driven = std::clamp(driven, -10.0f, 10.0f);
 
-        // --- Generate harmonic products (before filtering) ---
-        // Even/2nd generator: x * |x| gives second-harmonic rich term
-        float quadSample = driven * std::fabs(driven); // signed squared
-        float cubicSample = driven * driven * driven;   // x^3
+        // Harmonic generators
+        float quadSample = driven * std::fabs(driven); // 2nd harmonic generator
+        float cubicSample = driven * driven * driven;  // 3rd harmonic generator
 
-        // write into circular buffers
+        // Write into circular buffers
         quadPos_ = (quadPos_ + 1) % N;
         cubicPos_ = (cubicPos_ + 1) % N;
         quadBuf_[quadPos_] = quadSample;
         cubicBuf_[cubicPos_] = cubicSample;
 
-        // Apply GSinc FIR to both harmonic products
+        // Low-pass filter
         float quadFiltered = fir_filter(quadBuf_, quadPos_, coeff);
         float cubicFiltered = fir_filter(cubicBuf_, cubicPos_, coeff);
 
-        // --- Activation / soft threshold (smooth knee) ---
-        // map abs(driven) into activation 0..1 using smoothstep with knee
-        float absDriven = std::fabs(driven);
-        float act = 0.0f;
-        if (absDriven <= threshold)
-        {
-            // below threshold: activation rises smoothly inside knee range
-            // compute t = 1 - ((threshold - abs)/knee) clamped
-            float t = (threshold - absDriven) / knee;
-            // we want small activation near threshold - use reversed smoothstep
-            // but simpler: when abs <= threshold -> act = 0
-            act = 0.0f;
-        }
-        else
-        {
-            // above threshold -> scale upto 1 over small range (knee)
-            float t = (absDriven - threshold) / knee; // how far into saturation
-            // use smoothstep cubic for gentle ramp
-            if (t < 0.0f) t = 0.0f;
-            if (t > 1.0f) t = 1.0f;
-            act = smoothstep_cubic(t);
-        }
+        // Scale by alpha/beta
+        float quadContribution = alpha * quadFiltered;
+        float cubicContribution = beta * cubicFiltered;
 
-        // Alternatively, we want some subtle contribution even below threshold (soft behavior)
-        // Implement a soft base contribution that is small even below threshold:
-        // baseFactor = clamp(absDriven / threshold, 0..1)   (optional)
-        float baseFactor = (threshold > 0.0f) ? std::clamp(absDriven / threshold, 0.0f, 1.0f) : 1.0f;
-        // final activation for harmonic paths = mix of baseFactor and act
-        float harmonicGain = baseFactor * 0.4f + act * 0.6f; // blend: 40% soft base, 60% threshold-driven
+        // Combine with linear path
+        float combined = driven + quadContribution + cubicContribution;
 
-        // --- Scale harmonic contributions by alpha/beta and activation ---
-        float alpha = alphaBase; // 2nd harmonic weight (user)
-        float beta = betaBase;  // 3rd harmonic weight (user)
-
-        float quadContribution = alpha * harmonicGain * quadFiltered;
-        float cubicContribution = beta * harmonicGain * cubicFiltered;
-
-        // Linear path stays as driven (pre-gain)
-        float linearPath = driven;
-
-        // Combine: linear + alpha*LP(2nd) + beta*LP(3rd)
-        float combined = linearPath + quadContribution + cubicContribution;
-
-        // Hysteresis smoothing (one-pole)
+        // Hysteresis smoothing
         hystState_ += hyst * (combined - hystState_);
-        if (!std::isfinite(hystState_)) hystState_ = 0.0f;
 
         float wet = hystState_;
 
-        // Mix dry/wet (dry = original input, not pre-gain; wet = processed)
+        // Mix dry and wet
         float out = (1.0f - mix) * input + mix * wet;
-
-        // safety clamp
-        if (!std::isfinite(out)) out = 0.0f;
         out = std::clamp(out, -20.0f, 20.0f);
 
         outBuf[s] = out;
     }
 }
 
-// Register plugin with SE
+// Register plugin
 namespace
 {
     auto r = Register<RwSSaturation>::withId(L"RwSSaturation");
