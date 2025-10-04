@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
-		<Description>Magnetic-style saturator with cubic shaping, hysteresis and lowpass pre-filter.</Description>
+		<Description>Transformer-style cubic saturation. Linear + α·LP(x³) term (9-tap gsinc at 4kHz). Threshold controls when cubic engages. Hysteresis smoothing.</Description>
 
 		<Audio>
-			<!-- Audio Pins -->
+			<!-- Audio -->
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
 			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
 
 			<!-- Controls -->
-			<Pin name="Drive" datatype="float" direction="in" rate="control" default="1.0"/>
-			<Pin name="Mix" datatype="float" direction="in" rate="control" default="1.0"/>
-			<Pin name="Alpha" datatype="float" direction="in" rate="control" default="0.5"/>
-			<Pin name="Hysteresis" datatype="float" direction="in" rate="control" default="0.0"/>
+			<Pin name="Drive"      datatype="float" direction="in" rate="control" default="1.0"/>
+			<Pin name="Mix"        datatype="float" direction="in" rate="control" default="1.0"/>
+			<Pin name="Alpha"      datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Hysteresis" datatype="float" direction="in" rate="control" default="0.02"/>
+			<Pin name="Threshold"  datatype="float" direction="in" rate="control" default="0.9"/>
 		</Audio>
 
 		<Vendor>Road_within_Spacetime</Vendor>

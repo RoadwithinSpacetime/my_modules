@@ -2,6 +2,7 @@
 #include "mp_sdk_audio.h"
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -23,19 +24,21 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    FloatInPin  pinDrive_;   // gain / drive
-    FloatInPin  pinMix_;     // dry/wet mix (0..1)
-    FloatInPin  pinAlpha_;   // cubic strength
-    FloatInPin  pinHyst_;    // hysteresis amount
+    FloatInPin  pinDrive_;     // pre-gain (>= 0)
+    FloatInPin  pinMix_;       // dry/wet 0..1
+    FloatInPin  pinAlpha_;     // cubic strength base
+    FloatInPin  pinHyst_;      // hysteresis smoothing (0..1)
+    FloatInPin  pinThreshold_; // threshold for saturation (linear scale, 0..1). default ~0.9
 
-    // Filter state (one-pole lowpass ~4 kHz)
-    float lp_a0_ = 0.0f;
-    float lp_b1_ = 0.0f;
-    float lp_z1_ = 0.0f;
+    // GSinc FIR (9 taps) for LP on cubic term
+    std::vector<float> gsincCoeffs_;
+    std::vector<float> cubicBuf_;
+    int cubicBufPos_;
+    const int gsincTaps_ = 9;
 
     // Hysteresis state
-    float hystState_ = 0.0f;
+    float hystState_;
 
     // Internal
-    double sampleRate_ = 44100.0;
+    double sampleRate_;
 };
