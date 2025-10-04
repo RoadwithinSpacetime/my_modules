@@ -2,7 +2,6 @@
 #include "mp_sdk_audio.h"
 #include <vector>
 #include <cmath>
-#include <algorithm>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -24,29 +23,22 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    FloatInPin  pinDrive_;     // pre-gain
-    FloatInPin  pinMix_;       // dry/wet 0..1
-    FloatInPin  pinAlpha_;     // alpha -> 2nd harmonic weight
-    FloatInPin  pinBeta_;      // beta  -> 3rd harmonic weight
-    FloatInPin  pinHyst_;      // hysteresis smoothing 0..1
+    FloatInPin  pinDrive_;   // gain / drive
+    FloatInPin  pinMix_;     // dry/wet mix (0..1)
+    FloatInPin  pinAlpha_;   // cubic (3rd harmonic)
+    FloatInPin  pinBeta_;    // quadratic (2nd harmonic)
+    FloatInPin  pinHyst_;    // hysteresis amount
 
-    // GSinc FIR (9 taps) for LP on harmonic products
-    std::vector<float> gsincCoeffs_;
-    const int gsincTaps_ = 9;
+    // FIR filter (9-tap sinc low-pass ~4 kHz)
+    std::vector<float> firCoeffs_;
+    std::vector<float> firBuffer_;
+    int firPos_ = 0;
 
-    // Circular buffers for harmonic products
-    std::vector<float> quadBuf_;
-    std::vector<float> cubicBuf_;
-    int quadPos_;
-    int cubicPos_;
+    float processFIR(float input);
 
     // Hysteresis state
-    float hystState_;
+    float hystState_ = 0.0f;
 
-    // sample rate
-    double sampleRate_;
-
-    // Helpers
-    static std::vector<float> make_gsinc_coeffs(int taps, double sampleRate, double cutoffHz);
-    inline float fir_filter(const std::vector<float>& buf, int pos, const std::vector<float>& coeffs);
+    // Internal
+    double sampleRate_ = 44100.0;
 };

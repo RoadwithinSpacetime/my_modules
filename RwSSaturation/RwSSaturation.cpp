@@ -1,60 +1,11 @@
 #include "RwSSaturation.h"
 #include <cstring>
+#include <algorithm>
 
 #undef max
 #undef min
 
-// Build windowed sinc (Hamming window), normalized to DC = 1
-std::vector<float> RwSSaturation::make_gsinc_coeffs(int taps, double sampleRate, double cutoffHz)
-{
-    std::vector<float> h(taps);
-    const int mid = (taps - 1) / 2;
-    const double fc = cutoffHz / sampleRate;
-
-    for (int n = 0; n < taps; ++n)
-    {
-        int k = n - mid;
-        double sinc;
-        if (k == 0)
-            sinc = 2.0 * fc;
-        else
-        {
-            double x = 2.0 * M_PI * fc * k;
-            sinc = std::sin(x) / (M_PI * k);
-        }
-        double w = 0.54 - 0.46 * std::cos(2.0 * M_PI * n / (taps - 1));
-        h[n] = static_cast<float>(sinc * w);
-    }
-
-    // normalize
-    double sum = 0.0;
-    for (auto v : h) sum += v;
-    if (sum != 0.0)
-    {
-        for (auto& v : h) v = static_cast<float>(v / sum);
-    }
-    return h;
-}
-
-// FIR convolution using circular buffer
-inline float RwSSaturation::fir_filter(const std::vector<float>& buf, int pos, const std::vector<float>& coeffs)
-{
-    const int N = static_cast<int>(coeffs.size());
-    double acc = 0.0;
-    int idx = pos;
-    for (int k = 0; k < N; ++k)
-    {
-        acc += coeffs[k] * buf[idx];
-        if (--idx < 0) idx += N;
-    }
-    return static_cast<float>(acc);
-}
-
 RwSSaturation::RwSSaturation()
-    : quadPos_(0)
-    , cubicPos_(0)
-    , hystState_(0.0f)
-    , sampleRate_(44100.0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -68,15 +19,29 @@ RwSSaturation::RwSSaturation()
 int32_t RwSSaturation::open()
 {
     sampleRate_ = getSampleRate();
-    if (sampleRate_ <= 0.0) sampleRate_ = 44100.0;
 
-    const double cutoffHz = 4000.0;
-    gsincCoeffs_ = make_gsinc_coeffs(gsincTaps_, sampleRate_, cutoffHz);
+    // --- Design a simple 9-tap low-pass sinc FIR (~4 kHz cutoff)
+    int taps = 9;
+    firCoeffs_.resize(taps);
+    firBuffer_.assign(taps, 0.0f);
+    firPos_ = 0;
 
-    quadBuf_.assign(gsincTaps_, 0.0f);
-    cubicBuf_.assign(gsincTaps_, 0.0f);
-    quadPos_ = cubicPos_ = 0;
-    hystState_ = 0.0f;
+    double fc = 4000.0 / (sampleRate_ / 2.0); // normalized cutoff
+    int M = taps - 1;
+    for (int n = 0; n < taps; ++n)
+    {
+        int k = n - M / 2;
+        if (k == 0)
+            firCoeffs_[n] = (float)fc;
+        else
+            firCoeffs_[n] = (float)(sin(M_PI * fc * k) / (M_PI * k));
+        // Hamming window
+        firCoeffs_[n] *= (0.54f - 0.46f * cosf(2.0f * (float)M_PI * n / M));
+    }
+    // Normalize gain
+    float sum = 0.0f;
+    for (auto c : firCoeffs_) sum += c;
+    for (auto& c : firCoeffs_) c /= sum;
 
     setSubProcess(&RwSSaturation::subProcess);
     pinOut_.setStreaming(true);
@@ -86,90 +51,68 @@ int32_t RwSSaturation::open()
 
 void RwSSaturation::onSetPins()
 {
-    if (pinIn_.isStreaming())
-    {
-        setSubProcess(&RwSSaturation::subProcess);
-        pinOut_.setStreaming(true);
-    }
-    else
-    {
-        setSubProcess(&RwSSaturation::subProcessSilent);
-        pinOut_.setStreaming(false);
-    }
+    setSubProcess(&RwSSaturation::subProcess);
+    pinOut_.setStreaming(true);
 }
 
 void RwSSaturation::subProcessSilent(int sampleFrames)
 {
     float* out = getBuffer(pinOut_);
-    if (out) memset(out, 0, sampleFrames * sizeof(float));
+    if (out)
+        memset(out, 0, sampleFrames * sizeof(float));
+}
 
-    float* in = getBuffer(pinIn_);
-    if (in && pinIn_.isStreaming())
+float RwSSaturation::processFIR(float input)
+{
+    int taps = (int)firCoeffs_.size();
+    firBuffer_[firPos_] = input;
+
+    float y = 0.0f;
+    int idx = firPos_;
+    for (int i = 0; i < taps; ++i)
     {
-        setSubProcess(&RwSSaturation::subProcess);
-        pinOut_.setStreaming(true);
-        subProcess(sampleFrames);
+        y += firCoeffs_[i] * firBuffer_[idx];
+        idx = (idx - 1 + taps) % taps;
     }
+
+    firPos_ = (firPos_ + 1) % taps;
+    return y;
 }
 
 void RwSSaturation::subProcess(int sampleFrames)
 {
-    const float* inBuf = getBuffer(pinIn_);
-    float* outBuf = getBuffer(pinOut_);
-    if (!inBuf || !outBuf) return;
+    const float* in = getBuffer(pinIn_);
+    float* out = getBuffer(pinOut_);
+    if (!in || !out) return;
 
-    const float drive = std::clamp(pinDrive_.getValue(), 0.0f, 20.0f);
-    const float mix = std::clamp(pinMix_.getValue(), 0.0f, 1.0f);
-    const float alpha = pinAlpha_.getValue(); // even harmonic
-    const float beta = pinBeta_.getValue();  // odd harmonic
-    const float hyst = std::clamp(pinHyst_.getValue(), 0.0f, 1.0f);
-
-    const int N = gsincTaps_;
-    auto& coeff = gsincCoeffs_;
+    float drive = (std::max)(0.0f, pinDrive_.getValue());
+    float mix = (std::clamp)(pinMix_.getValue(), 0.0f, 1.0f);
+    float alpha = pinAlpha_.getValue();
+    float beta = pinBeta_.getValue();
+    float hyst = pinHyst_.getValue();
 
     for (int s = 0; s < sampleFrames; ++s)
     {
-        float input = inBuf[s];
+        // Apply drive
+        float x = in[s] * drive;
 
-        // Pre-gain
-        float driven = input * drive;
-        driven = std::clamp(driven, -10.0f, 10.0f);
+        // Harmonics (filter applied to nonlinear terms)
+        float x2 = processFIR(x * x);
+        float x3 = processFIR(x * x * x);
 
-        // Harmonic generators
-        float quadSample = driven * std::fabs(driven); // 2nd harmonic generator
-        float cubicSample = driven * driven * driven;  // 3rd harmonic generator
-
-        // Write into circular buffers
-        quadPos_ = (quadPos_ + 1) % N;
-        cubicPos_ = (cubicPos_ + 1) % N;
-        quadBuf_[quadPos_] = quadSample;
-        cubicBuf_[cubicPos_] = cubicSample;
-
-        // Low-pass filter
-        float quadFiltered = fir_filter(quadBuf_, quadPos_, coeff);
-        float cubicFiltered = fir_filter(cubicBuf_, cubicPos_, coeff);
-
-        // Scale by alpha/beta
-        float quadContribution = alpha * quadFiltered;
-        float cubicContribution = beta * cubicFiltered;
-
-        // Combine with linear path
-        float combined = driven + quadContribution + cubicContribution;
+        // Combine: linear path minus cubic + quadratic
+        float shaped = x - alpha * x3 + beta * x2;
 
         // Hysteresis smoothing
-        hystState_ += hyst * (combined - hystState_);
+        hystState_ += hyst * (shaped - hystState_);
+        float saturated = hystState_;
 
-        float wet = hystState_;
-
-        // Mix dry and wet
-        float out = (1.0f - mix) * input + mix * wet;
-        out = std::clamp(out, -20.0f, 20.0f);
-
-        outBuf[s] = out;
+        // Dry/Wet mix
+        out[s] = (1.0f - mix) * in[s] + mix * saturated;
     }
 }
 
-// Register plugin
+// Register
 namespace
 {
     auto r = Register<RwSSaturation>::withId(L"RwSSaturation");

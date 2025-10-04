@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
-		<Description>Transformer-inspired saturation: linear + α·LP(2nd) + β·LP(3rd), 9-tap GSinc @4kHz, optional hysteresis smoothing.</Description>
+		<Description>Magnetic-style saturator with quadratic & cubic shaping, FIR pre-filter, and hysteresis.</Description>
 
 		<Audio>
+			<!-- Audio Pins -->
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
 			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
 
-			<Pin name="Drive"      datatype="float" direction="in" rate="control" default="1.0"/>
-			<Pin name="Mix"        datatype="float" direction="in" rate="control" default="1.0"/>
-			<Pin name="Alpha"      datatype="float" direction="in" rate="control" default="0.5"/>
-			<Pin name="Beta"       datatype="float" direction="in" rate="control" default="0.5"/>
-			<Pin name="Hysteresis" datatype="float" direction="in" rate="control" default="0.02"/>
+			<!-- Controls -->
+			<Pin name="Drive" datatype="float" direction="in" rate="control" default="1.0"/>
+			<Pin name="Mix" datatype="float" direction="in" rate="control" default="1.0"/>
+			<Pin name="Alpha" datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Beta" datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Hysteresis" datatype="float" direction="in" rate="control" default="0.0"/>
 		</Audio>
 
 		<Vendor>Road_within_Spacetime</Vendor>
