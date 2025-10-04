@@ -106,7 +106,7 @@ void RwSSaturation::subProcess(int sampleFrames)
         float harmonic3 = alpha * 0.10f * x3f;  // 3rd harmonic, normalized
 
         // Combine with linear
-        float shaped = x + harmonic2 - harmonic3;
+        float shaped = x - harmonic2 - harmonic3;
 
         // Hysteresis smoothing
         hystState_ += hyst * (shaped - hystState_);
