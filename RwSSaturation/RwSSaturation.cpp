@@ -21,13 +21,13 @@ int32_t RwSSaturation::open()
     if (sampleRate_ <= 0.0) sampleRate_ = 44100.0;
 
     // Design shared FIR low-pass (~4 kHz)
-    firTaps_ = 9;
+    firTaps_ = 9; // default; change to 31 for stronger filtering
     makeFIR(firTaps_, sampleRate_, 4000.0, firCoeffs_);
     x2Buf_.assign(firTaps_, 0.0f);
     x3Buf_.assign(firTaps_, 0.0f);
     firPos_ = 0;
 
-    // DC removal (for x² path)
+    // DC removal (for x^2 path)
     const double dcTau = 0.05; // 50 ms
     x2_dc_alpha_ = static_cast<float>(1.0 - std::exp(-1.0 / (sampleRate_ * dcTau)));
     x2_dc_ = 0.0f;
@@ -61,15 +61,25 @@ void RwSSaturation::makeFIR(int taps, double sampleRate, double cutoffHz, std::v
     for (int n = 0; n < taps; ++n)
     {
         int k = n - M / 2;
-        double h = (k == 0) ? 2.0 * fc : std::sin(2.0 * M_PI * fc * k) / (M_PI * k);
-        double w = 0.54 - 0.46 * std::cos(2.0 * M_PI * n / M);
+        double h;
+        if (k == 0)
+            h = 2.0 * fc;
+        else
+        {
+            double x = 2.0 * M_PI * fc * k;
+            h = std::sin(x) / (M_PI * k);
+        }
+        double w = 0.54 - 0.46 * std::cos(2.0 * M_PI * n / M); // Hamming
         coeffs[n] = static_cast<float>(h * w);
     }
 
     // Normalize to unity gain at DC
     double sum = 0.0;
     for (auto c : coeffs) sum += c;
-    for (auto& c : coeffs) c = static_cast<float>(c / sum);
+    if (sum != 0.0)
+    {
+        for (auto& c : coeffs) c = static_cast<float>(c / sum);
+    }
 }
 
 float RwSSaturation::firProcess(std::vector<float>& buf, int pos, const std::vector<float>& coeffs, float input)
@@ -92,8 +102,9 @@ void RwSSaturation::subProcess(int sampleFrames)
     float* out = getBuffer(pinOut_);
     if (!in || !out) return;
 
-    const float drive = std::max(0.0f, pinDrive_.getValue());
-    const float trim = 1.0f / std::sqrt(std::max(0.0001f, drive)); // perceptual output gain
+    // Read parameters
+    float drive = std::max(0.0001f, pinDrive_.getValue()); // prevent zero
+    const float trim = 1.0f / drive;                        // mathematical inverse compensation
     const float mix = std::clamp(pinMix_.getValue(), 0.0f, 1.0f);
     const float alpha = pinAlpha_.getValue();
     const float beta = pinBeta_.getValue();
@@ -105,31 +116,42 @@ void RwSSaturation::subProcess(int sampleFrames)
 
     for (int s = 0; s < sampleFrames; ++s)
     {
-        float x = in[s] * drive;
+        // linear (unfiltered) path with pre-drive (we keep dry path as original input for mix)
+        float x_lin = in[s] * drive;
 
-        // nonlinear terms
-        float x2 = x * x;
-        float x3 = x * x * x;
+        // nonlinear products
+        float x2 = x_lin * x_lin;
+        float x3 = x_lin * x_lin * x_lin;
 
-        // DC-remove x²
+        // DC remove x^2
         x2_dc_ += x2_dc_alpha_ * (x2 - x2_dc_);
         float x2_hp = x2 - x2_dc_;
 
-        // Filter harmonics
+        // Filter harmonics through shared FIR buffers (x2 and x3 paths)
         int pos = firPos_;
         float x2f = firProcess(x2Buf_, pos, firCoeffs_, x2_hp);
         float x3f = firProcess(x3Buf_, pos, firCoeffs_, x3);
         firPos_ = (firPos_ + 1) % N;
 
-        // Combine harmonic shaping
-        float shaped = x - effBeta * x3f - effAlpha * x2f;
+        // harmonic contributions
+        float harm2 = effAlpha * x2f;
+        float harm3 = effBeta * x3f;
 
-        // Hysteresis smoothing
+        // combine: linear - 3rd + 2nd  (per earlier design)
+        float shaped = x_lin - harm3 - harm2;
+
+        // hysteresis smoothing (one-pole)
         hystState_ += hyst * (shaped - hystState_);
-        float wet = hystState_ * trim;
+        float wet = hystState_ * trim; // apply mathematical inverse trim here
 
-        // Mix dry/wet
-        out[s] = (1.0f - mix) * in[s] + mix * wet;
+        // mix dry/wet: dry path is original input (no drive)
+        float outSample = (1.0f - mix) * in[s] + mix * wet;
+
+        // safety clamp
+        if (!std::isfinite(outSample)) outSample = 0.0f;
+        outSample = std::clamp(outSample, -20.0f, 20.0f);
+
+        out[s] = outSample;
     }
 }
 

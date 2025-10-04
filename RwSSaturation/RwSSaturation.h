@@ -16,7 +16,7 @@ public:
     RwSSaturation();
 
     int32_t open() override;
-    void onSetPins() override;
+    void onSetPins(); // not marked override to match MpBase2 signature
     void subProcess(int sampleFrames);
     void subProcessSilent(int sampleFrames);
 
@@ -30,14 +30,14 @@ private:
     FloatInPin  pinBeta_;   // 2nd harmonic strength
     FloatInPin  pinHyst_;   // hysteresis amount
 
-    // FIR (shared 9-tap GSinc lowpass)
+    // FIR (shared for harmonics)
     void makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs);
     float firProcess(std::vector<float>& buf, int pos, const std::vector<float>& coeffs, float input);
 
     std::vector<float> firCoeffs_;
     std::vector<float> x2Buf_;
     std::vector<float> x3Buf_;
-    int firTaps_ = 9;
+    int firTaps_ = 31;   // default taps (9). Increase to 31 for steeper roll-off.
     int firPos_ = 0;
 
     // DC removal for even harmonic
@@ -47,8 +47,8 @@ private:
     // Hysteresis state
     float hystState_ = 0.0f;
 
-    // Constants
-    const float betaScale_ = 0.25f; // 2nd harmonic normalization
+    // Scales (tweakable constants)
+    const float betaScale_ = 0.25f;  // 2nd harmonic normalization
     const float alphaScale_ = 0.15f; // 3rd harmonic normalization
 
     double sampleRate_ = 44100.0;
