@@ -2,6 +2,8 @@
 #include "mp_sdk_audio.h"
 #include <vector>
 #include <cmath>
+#include <algorithm>
+#include <cstring>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -14,31 +16,42 @@ class RwSSaturation : public MpBase2
 public:
     RwSSaturation();
 
-    int32_t open() override;
-    void onSetPins() override;
-    void subProcess(int sampleFrames);
-    void subProcessSilent(int sampleFrames);
+    int32_t open() override; // this one is correct
+    void onSetPins();        // remove 'override'
+    void subProcess(int sampleFrames); // remove 'override'
+    void subProcessSilent(int sampleFrames); // remove 'override'
 
 private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    FloatInPin  pinDrive_;   // gain / drive
-    FloatInPin  pinMix_;     // dry/wet mix (0..1)
-    FloatInPin  pinAlpha_;   // cubic harmonic (3rd)
-    FloatInPin  pinBeta_;    // quadratic harmonic (2nd)
-    FloatInPin  pinHyst_;    // hysteresis smoothing
+    FloatInPin  pinDrive_;
+    FloatInPin  pinMix_;
+    FloatInPin  pinAlpha_;
+    FloatInPin  pinBeta_;
+    FloatInPin  pinHyst_;
 
-    // FIR filter (9-tap sinc low-pass ~4 kHz)
+    // FIR filter (shared for harmonics)
     std::vector<float> firCoeffs_;
-    std::vector<float> firBuffer_;
+    std::vector<float> x2Buf_;
+    std::vector<float> x3Buf_;
     int firPos_ = 0;
+    int firTaps_ = 31;
 
-    float processFIR(float input);
+    // DC removal
+    float x2_dc_ = 0.0f;
+    float x2_dc_alpha_ = 0.0f;
 
-    // Hysteresis state
+    // Hysteresis
     float hystState_ = 0.0f;
 
-    // Internal
+    // Scaling constants
+    float betaScale_ = 0.5f;
+    float alphaScale_ = 0.15f;
+
     double sampleRate_ = 44100.0;
+
+    // Helpers
+    void makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs);
+    inline float firProcess(std::vector<float>& buf, int pos, const std::vector<float>& coeffs, float input);
 };
