@@ -24,21 +24,32 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    FloatInPin  pinDrive_;     // pre-gain (>= 0)
+    FloatInPin  pinDrive_;     // pre-gain
     FloatInPin  pinMix_;       // dry/wet 0..1
-    FloatInPin  pinAlpha_;     // cubic strength base
-    FloatInPin  pinHyst_;      // hysteresis smoothing (0..1)
-    FloatInPin  pinThreshold_; // threshold for saturation (linear scale, 0..1). default ~0.9
+    FloatInPin  pinAlpha_;     // alpha -> 2nd harmonic weight (even)
+    FloatInPin  pinBeta_;      // beta  -> 3rd harmonic weight (odd)
+    FloatInPin  pinThreshold_; // linear amplitude threshold for saturation (0..2)
+    FloatInPin  pinKnee_;      // knee width (linear units)
+    FloatInPin  pinHyst_;      // hysteresis smoothing 0..1
 
-    // GSinc FIR (9 taps) for LP on cubic term
+    // GSinc FIR (9 taps) for LP on harmonic products
     std::vector<float> gsincCoeffs_;
-    std::vector<float> cubicBuf_;
-    int cubicBufPos_;
     const int gsincTaps_ = 9;
 
-    // Hysteresis state
+    // Circular buffers for harmonic products
+    std::vector<float> quadBuf_;   // stores x^2 * sign (even generator)
+    std::vector<float> cubicBuf_;  // stores x^3
+    int quadPos_;
+    int cubicPos_;
+
+    // Hysteresis state (one pole)
     float hystState_;
 
-    // Internal
+    // sample rate
     double sampleRate_;
+
+    // Helpers
+    static std::vector<float> make_gsinc_coeffs(int taps, double sampleRate, double cutoffHz);
+    inline float fir_filter(const std::vector<float>& buf, int pos, const std::vector<float>& coeffs);
+    inline float smoothstep_cubic(float x); // 0..1 smooth cubic step
 };
