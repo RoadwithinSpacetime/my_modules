@@ -87,8 +87,8 @@ void RwSSaturation::subProcess(int sampleFrames)
 
     float drive = (std::max)(0.0f, pinDrive_.getValue());
     float mix = (std::clamp)(pinMix_.getValue(), 0.0f, 1.0f);
-    float alpha = pinAlpha_.getValue();
-    float beta = pinBeta_.getValue();
+    float alpha = pinAlpha_.getValue(); // cubic
+    float beta = pinBeta_.getValue();  // quadratic
     float hyst = pinHyst_.getValue();
 
     for (int s = 0; s < sampleFrames; ++s)
@@ -96,12 +96,17 @@ void RwSSaturation::subProcess(int sampleFrames)
         // Apply drive
         float x = in[s] * drive;
 
-        // Harmonics (filter applied to nonlinear terms)
-        float x2 = processFIR(x * x);
-        float x3 = processFIR(x * x * x);
+        // Filtered harmonics
+        float x2f = processFIR(x * x);
+        float x3f = processFIR(x * x * x);
 
-        // Combine: linear path minus cubic + quadratic
-        float shaped = x - alpha * x3 + beta * x2;
+        // Normalize harmonic contributions (prevent overpowering linear path)
+        // Adjust constants as needed for musical scaling
+        float harmonic2 = beta * 0.25f * x2f;  // 2nd harmonic, normalized
+        float harmonic3 = alpha * 0.10f * x3f;  // 3rd harmonic, normalized
+
+        // Combine with linear
+        float shaped = x + harmonic2 - harmonic3;
 
         // Hysteresis smoothing
         hystState_ += hyst * (shaped - hystState_);

@@ -25,9 +25,9 @@ private:
     AudioOutPin pinOut_;
     FloatInPin  pinDrive_;   // gain / drive
     FloatInPin  pinMix_;     // dry/wet mix (0..1)
-    FloatInPin  pinAlpha_;   // cubic (3rd harmonic)
-    FloatInPin  pinBeta_;    // quadratic (2nd harmonic)
-    FloatInPin  pinHyst_;    // hysteresis amount
+    FloatInPin  pinAlpha_;   // cubic harmonic (3rd)
+    FloatInPin  pinBeta_;    // quadratic harmonic (2nd)
+    FloatInPin  pinHyst_;    // hysteresis smoothing
 
     // FIR filter (9-tap sinc low-pass ~4 kHz)
     std::vector<float> firCoeffs_;

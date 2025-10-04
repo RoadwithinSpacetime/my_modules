@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
-		<Description>Magnetic-style saturator with quadratic & cubic shaping, FIR pre-filter, and hysteresis.</Description>
+		<Description>Magnetic-style saturator with quadratic & cubic harmonics, FIR pre-filter, and hysteresis.</Description>
 
 		<Audio>
 			<!-- Audio Pins -->
