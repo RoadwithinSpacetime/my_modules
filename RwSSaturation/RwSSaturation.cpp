@@ -150,7 +150,7 @@ void RwSSaturation::subProcess(int sampleFrames)
         float x3f = firProcess(x3Buf_, pos, firCoeffs_, x3);
         firPos_ = (firPos_ + 1) % N;
 
-        float shaped = x_lin - effBeta * x3f - effAlpha * x2f;
+        float shaped = x_lin - effBeta * x3f + effAlpha * x2f;
 
         hystState_ += hyst * (shaped - hystState_);
         float wet = hystState_ * trim;
