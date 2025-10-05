@@ -58,6 +58,14 @@ void RwSSaturation::onSetPins()
     double hystCutoff = std::clamp(pinHystFreq_.getValue(), 1000.0f, 20000.0f);
     makeFIR(hystFirTaps_, sampleRate_, hystCutoff, hystFirCoeffs_);
 
+    // if input is silent, enter CPU-saver mode
+    if (!pinIn_.isStreaming())
+    {
+        setSubProcess(&RwSSaturation::subProcessSilent);
+        pinOut_.setStreaming(false);
+        return;
+    }
+
     setSubProcess(&RwSSaturation::subProcess);
     pinOut_.setStreaming(true);
 }
@@ -68,12 +76,11 @@ void RwSSaturation::subProcessSilent(int sampleFrames)
     if (out)
         std::memset(out, 0, sampleFrames * sizeof(float));
 
-    float* in = getBuffer(pinIn_);
-    if (in && pinIn_.isStreaming())
+    // Wake up automatically when input resumes
+    if (pinIn_.isStreaming())
     {
         setSubProcess(&RwSSaturation::subProcess);
         pinOut_.setStreaming(true);
-        subProcess(sampleFrames);
     }
 }
 
@@ -164,6 +171,13 @@ void RwSSaturation::subProcess(int sampleFrames)
         if (!std::isfinite(outSample)) outSample = 0.0f;
         outSample = std::clamp(outSample, -20.0f, 20.0f);
         out[s] = outSample;
+    }
+
+    // enter silent mode if input stream stops
+    if (!pinIn_.isStreaming())
+    {
+        setSubProcess(&RwSSaturation::subProcessSilent);
+        pinOut_.setStreaming(false);
     }
 }
 
