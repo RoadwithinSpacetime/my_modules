@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
-		<Description>Transformer-style saturator with level-dependent cubic and quadratic harmonics, hysteresis, and dynamic filtering.</Description>
+		<Description>
+			Transformer-style saturator with dual 9-tap harmonic prefilters,
+			level-dependent cubic and quadratic harmonics, hysteresis filtering,
+			and external cutoff control.
+		</Description>
 
 		<Audio>
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>

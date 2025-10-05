@@ -34,11 +34,13 @@ private:
 
     // FIR and buffers
     std::vector<float> harmFirCoeffs_;
+    std::vector<float> harmFirBuf1_;
+    std::vector<float> harmFirBuf2_;
     std::vector<float> hystFirCoeffs_;
-    std::vector<float> harmFirBuf_;
     std::vector<float> hystFirBuf_;
 
-    int harmFirPos_;
+    int harmFirPos1_;
+    int harmFirPos2_;
     int hystFirPos_;
     int harmFirTaps_;
     int hystFirTaps_;

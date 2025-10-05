@@ -6,7 +6,7 @@
 #undef max
 
 RwSSaturation::RwSSaturation()
-    : harmFirPos_(0), hystFirPos_(0)
+    : harmFirPos1_(0), harmFirPos2_(0), hystFirPos_(0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -23,19 +23,21 @@ int32_t RwSSaturation::open()
     sampleRate_ = getSampleRate();
     if (sampleRate_ <= 0.0) sampleRate_ = 44100.0;
 
-    harmFirTaps_ = 31;
+    harmFirTaps_ = 9;
     hystFirTaps_ = 31;
 
-    // harmonic path filter before x²/x³
+    // two identical 9-tap filters in series
     makeFIR(harmFirTaps_, sampleRate_, 15000.0, harmFirCoeffs_);
 
     // hysteresis FIR default 15 kHz
     makeFIR(hystFirTaps_, sampleRate_, 15000.0, hystFirCoeffs_);
 
-    harmFirBuf_.assign(harmFirTaps_, 0.0f);
+    harmFirBuf1_.assign(harmFirTaps_, 0.0f);
+    harmFirBuf2_.assign(harmFirTaps_, 0.0f);
     hystFirBuf_.assign(hystFirTaps_, 0.0f);
 
-    harmFirPos_ = 0;
+    harmFirPos1_ = 0;
+    harmFirPos2_ = 0;
     hystFirPos_ = 0;
 
     x2_dc_ = 0.0f;
@@ -127,16 +129,17 @@ void RwSSaturation::subProcess(int sampleFrames)
 
     const float effAlpha = alpha * alphaScale_;
     const float effBeta = beta * betaScale_;
-    const float trim = 1.0f / (1.0f + (drive - 1.0f)); // soft compensation
+    const float trim = 1.0f / (1.0f + (drive - 1.0f));
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float x_in = in[s] * drive;
 
-        // shared pre-filter for harmonic path
-        float x_pre = this->firProcess(harmFirBuf_, harmFirPos_, harmFirCoeffs_, x_in);
+        // two 9-tap filters in series before harmonics
+        float x_pre = this->firProcess(harmFirBuf1_, harmFirPos1_, harmFirCoeffs_, x_in);
+        x_pre = this->firProcess(harmFirBuf2_, harmFirPos2_, harmFirCoeffs_, x_pre);
 
-        // generate harmonics from pre-filtered signal
+        // harmonic generation
         float x2 = x_pre * x_pre;
         float x3 = x_pre * x_pre * x_pre;
 
@@ -150,7 +153,7 @@ void RwSSaturation::subProcess(int sampleFrames)
 
         float shaped = x_in - harm2 - harm3;
 
-        // hysteresis smoothing
+        // hysteresis smoothing + filtering
         hystState_ += hyst * (shaped - hystState_);
         float wet = this->firProcess(hystFirBuf_, hystFirPos_, hystFirCoeffs_, hystState_);
 
