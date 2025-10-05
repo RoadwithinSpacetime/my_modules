@@ -20,19 +20,19 @@ int32_t RwSSaturation::open()
     sampleRate_ = getSampleRate();
     if (sampleRate_ <= 0.0) sampleRate_ = 44100.0;
 
-    // Design shared FIR low-pass (~4 kHz)
-    firTaps_ = 9; // default; change to 31 for stronger filtering
+    firTaps_ = 9;
     makeFIR(firTaps_, sampleRate_, 4000.0, firCoeffs_);
     x2Buf_.assign(firTaps_, 0.0f);
     x3Buf_.assign(firTaps_, 0.0f);
     firPos_ = 0;
 
-    // DC removal (for x^2 path)
-    const double dcTau = 0.05; // 50 ms
+    const double dcTau = 0.05;
     x2_dc_alpha_ = static_cast<float>(1.0 - std::exp(-1.0 / (sampleRate_ * dcTau)));
     x2_dc_ = 0.0f;
 
     hystState_ = 0.0f;
+    active_ = true;
+    silentCounter_ = 0;
 
     setSubProcess(&RwSSaturation::subProcess);
     pinOut_.setStreaming(true);
@@ -41,8 +41,12 @@ int32_t RwSSaturation::open()
 
 void RwSSaturation::onSetPins()
 {
-    setSubProcess(&RwSSaturation::subProcess);
-    pinOut_.setStreaming(true);
+    if (!active_)
+    {
+        setSubProcess(&RwSSaturation::subProcess);
+        pinOut_.setStreaming(true);
+        active_ = true;
+    }
 }
 
 void RwSSaturation::subProcessSilent(int sampleFrames)
@@ -50,6 +54,22 @@ void RwSSaturation::subProcessSilent(int sampleFrames)
     float* out = getBuffer(pinOut_);
     if (out)
         std::memset(out, 0, sampleFrames * sizeof(float));
+
+    // Check for signal to wake up
+    const float* in = getBuffer(pinIn_);
+    if (in && pinIn_.isStreaming())
+    {
+        for (int i = 0; i < sampleFrames; ++i)
+        {
+            if (std::fabs(in[i]) > 1e-8f)
+            {
+                setSubProcess(&RwSSaturation::subProcess);
+                pinOut_.setStreaming(true);
+                active_ = true;
+                return;
+            }
+        }
+    }
 }
 
 void RwSSaturation::makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs)
@@ -61,25 +81,14 @@ void RwSSaturation::makeFIR(int taps, double sampleRate, double cutoffHz, std::v
     for (int n = 0; n < taps; ++n)
     {
         int k = n - M / 2;
-        double h;
-        if (k == 0)
-            h = 2.0 * fc;
-        else
-        {
-            double x = 2.0 * M_PI * fc * k;
-            h = std::sin(x) / (M_PI * k);
-        }
-        double w = 0.54 - 0.46 * std::cos(2.0 * M_PI * n / M); // Hamming
+        double h = (k == 0) ? 2.0 * fc : std::sin(2.0 * M_PI * fc * k) / (M_PI * k);
+        double w = 0.54 - 0.46 * std::cos(2.0 * M_PI * n / M);
         coeffs[n] = static_cast<float>(h * w);
     }
 
-    // Normalize to unity gain at DC
     double sum = 0.0;
     for (auto c : coeffs) sum += c;
-    if (sum != 0.0)
-    {
-        for (auto& c : coeffs) c = static_cast<float>(c / sum);
-    }
+    for (auto& c : coeffs) c = static_cast<float>(c / sum);
 }
 
 float RwSSaturation::firProcess(std::vector<float>& buf, int pos, const std::vector<float>& coeffs, float input)
@@ -100,11 +109,14 @@ void RwSSaturation::subProcess(int sampleFrames)
 {
     const float* in = getBuffer(pinIn_);
     float* out = getBuffer(pinOut_);
-    if (!in || !out) return;
+    if (!in || !out)
+        return;
 
-    // Read parameters
-    float drive = std::max(0.0001f, pinDrive_.getValue()); // prevent zero
-    const float trim = 1.0f / drive;                        // mathematical inverse compensation
+    float driveParam = std::max(0.0001f, pinDrive_.getValue());
+    float knee = driveKnee_;
+    float drive = 1.0f + (driveParam - 1.0f) * (1.0f - std::exp(-knee * std::fabs(driveParam - 1.0f)));
+
+    const float trim = 1.0f / drive; // mathematical inverse trim
     const float mix = std::clamp(pinMix_.getValue(), 0.0f, 1.0f);
     const float alpha = pinAlpha_.getValue();
     const float beta = pinBeta_.getValue();
@@ -114,48 +126,58 @@ void RwSSaturation::subProcess(int sampleFrames)
     const float effAlpha = alpha * alphaScale_;
     const int N = static_cast<int>(firCoeffs_.size());
 
+    bool silentBlock = true;
+
     for (int s = 0; s < sampleFrames; ++s)
     {
-        // linear (unfiltered) path with pre-drive (we keep dry path as original input for mix)
-        float x_lin = in[s] * drive;
+        float x_in = in[s];
+        if (std::fabs(x_in) > 1e-8f)
+            silentBlock = false;
+
+        // linear drive
+        float x_lin = x_in * drive;
 
         // nonlinear products
         float x2 = x_lin * x_lin;
         float x3 = x_lin * x_lin * x_lin;
 
-        // DC remove x^2
+        // DC remove even term
         x2_dc_ += x2_dc_alpha_ * (x2 - x2_dc_);
         float x2_hp = x2 - x2_dc_;
 
-        // Filter harmonics through shared FIR buffers (x2 and x3 paths)
         int pos = firPos_;
         float x2f = firProcess(x2Buf_, pos, firCoeffs_, x2_hp);
         float x3f = firProcess(x3Buf_, pos, firCoeffs_, x3);
         firPos_ = (firPos_ + 1) % N;
 
-        // harmonic contributions
-        float harm2 = effAlpha * x2f;
-        float harm3 = effBeta * x3f;
+        float shaped = x_lin - effBeta * x3f - effAlpha * x2f;
 
-        // combine: linear - 3rd + 2nd  (per earlier design)
-        float shaped = x_lin - harm3 - harm2;
-
-        // hysteresis smoothing (one-pole)
         hystState_ += hyst * (shaped - hystState_);
-        float wet = hystState_ * trim; // apply mathematical inverse trim here
+        float wet = hystState_ * trim;
 
-        // mix dry/wet: dry path is original input (no drive)
-        float outSample = (1.0f - mix) * in[s] + mix * wet;
+        float outSample = (1.0f - mix) * x_in + mix * wet;
 
-        // safety clamp
-        if (!std::isfinite(outSample)) outSample = 0.0f;
         outSample = std::clamp(outSample, -20.0f, 20.0f);
-
         out[s] = outSample;
+    }
+
+    // Auto-sleep detection
+    if (silentBlock)
+    {
+        silentCounter_ += sampleFrames;
+        if (silentCounter_ > kSilentFramesBeforeSleep)
+        {
+            setSubProcess(&RwSSaturation::subProcessSilent);
+            active_ = false;
+        }
+    }
+    else
+    {
+        silentCounter_ = 0;
     }
 }
 
-// Register module
+// Register
 namespace
 {
     auto r = Register<RwSSaturation>::withId(L"RwSSaturation");

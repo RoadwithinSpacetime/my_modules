@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
-		<Description>Magnetic-style saturator: linear - β·LP(x²) − α·LP(x³), shared FIR for harmonics, hysteresis smoothing, and mathematical inverse trim (1/drive).</Description>
+		<Description>Magnetic-style saturator: soft-knee drive, β·LP(x²) − α·LP(x³), shared FIR for harmonics, hysteresis smoothing, and auto-sleep.</Description>
 
 		<Audio>
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>

@@ -16,7 +16,7 @@ public:
     RwSSaturation();
 
     int32_t open() override;
-    void onSetPins(); // not marked override to match MpBase2 signature
+    void onSetPins();
     void subProcess(int sampleFrames);
     void subProcessSilent(int sampleFrames);
 
@@ -24,11 +24,11 @@ private:
     // Pins
     AudioInPin  pinIn_;
     AudioOutPin pinOut_;
-    FloatInPin  pinDrive_;  // input drive
-    FloatInPin  pinMix_;    // dry/wet mix
-    FloatInPin  pinAlpha_;  // 3rd harmonic strength
-    FloatInPin  pinBeta_;   // 2nd harmonic strength
-    FloatInPin  pinHyst_;   // hysteresis amount
+    FloatInPin  pinDrive_;
+    FloatInPin  pinMix_;
+    FloatInPin  pinAlpha_;
+    FloatInPin  pinBeta_;
+    FloatInPin  pinHyst_;
 
     // FIR (shared for harmonics)
     void makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs);
@@ -37,19 +37,27 @@ private:
     std::vector<float> firCoeffs_;
     std::vector<float> x2Buf_;
     std::vector<float> x3Buf_;
-    int firTaps_ = 31;   // default taps (9). Increase to 31 for steeper roll-off.
+    int firTaps_ = 9;
     int firPos_ = 0;
 
-    // DC removal for even harmonic
+    // DC removal
     float x2_dc_ = 0.0f;
     float x2_dc_alpha_ = 0.0f;
 
-    // Hysteresis state
+    // Hysteresis
     float hystState_ = 0.0f;
 
-    // Scales (tweakable constants)
-    const float betaScale_ = 0.25f;  // 2nd harmonic normalization
-    const float alphaScale_ = 0.15f; // 3rd harmonic normalization
+    // Scales
+    const float betaScale_ = 0.25f;
+    const float alphaScale_ = 0.15f;
+
+    // Soft knee curve
+    float driveKnee_ = 2.0f; // larger = softer
+
+    // Auto sleep
+    bool active_ = true;
+    int silentCounter_ = 0;
+    static constexpr int kSilentFramesBeforeSleep = 2048;
 
     double sampleRate_ = 44100.0;
 };
