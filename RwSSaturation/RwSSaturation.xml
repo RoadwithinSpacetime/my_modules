@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PluginList>
 	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
-		<Description>Magnetic-style saturation with 2nd/3rd harmonic shaping, hysteresis FIR filtering, and automatic CPU sleep.</Description>
+		<Description>Transformer-style saturator with level-dependent cubic and quadratic harmonics, hysteresis, and dynamic filtering.</Description>
 
 		<Audio>
 			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
@@ -10,9 +10,9 @@
 			<Pin name="Drive" datatype="float" direction="in" rate="control" default="1.0"/>
 			<Pin name="Mix" datatype="float" direction="in" rate="control" default="1.0"/>
 			<Pin name="Alpha" datatype="float" direction="in" rate="control" default="0.5"/>
-			<Pin name="Beta" datatype="float" direction="in" rate="control" default="0.3"/>
-			<Pin name="Hysteresis" datatype="float" direction="in" rate="control" default="0.02"/>
-			<Pin name="Hysteresis Freq" datatype="float" direction="in" rate="control" default="4000.0"/>
+			<Pin name="Beta" datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Hysteresis" datatype="float" direction="in" rate="control" default="0.1"/>
+			<Pin name="HysteresisFreq" datatype="float" direction="in" rate="control" default="15000.0"/>
 		</Audio>
 
 		<Vendor>Road_within_Spacetime</Vendor>

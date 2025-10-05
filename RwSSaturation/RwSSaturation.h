@@ -13,61 +13,44 @@ class RwSSaturation : public MpBase2
 {
 public:
     RwSSaturation();
-
     int32_t open() override;
     void onSetPins() override;
-    void subProcess(int sampleFrames);
-    void subProcessSilent(int sampleFrames);
 
 private:
-    // Pins
-    AudioInPin  pinIn_;
-    AudioOutPin pinOut_;
-    FloatInPin  pinDrive_;
-    FloatInPin  pinMix_;
-    FloatInPin  pinAlpha_;    // 2nd harmonic amount
-    FloatInPin  pinBeta_;     // 3rd harmonic amount
-    FloatInPin  pinHyst_;     // hysteresis strength
-    FloatInPin  pinHystFreq_; // hysteresis filter cutoff
-
-    // FIR filter for harmonics
-    std::vector<float> firCoeffs_;
-    std::vector<float> x2Buf_;
-    std::vector<float> x3Buf_;
-    int firTaps_ = 31;
-    int firPos_ = 0;
-
-    // Hysteresis FIR (separate)
-    std::vector<float> hystCoeffs_;
-    std::vector<float> hystBuf_;
-    std::vector<float> hystCoeffsNew_;
-    int hystTaps_ = 31;
-    int hystPos_ = 0;
-
-    // FIR helpers
+    void subProcess(int sampleFrames);
+    void subProcessSilent(int sampleFrames);
     void makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs);
-    float firProcess(std::vector<float>& buf, int pos, const std::vector<float>& coeffs, float input);
+    float firProcess(std::vector<float>& buf, int& pos, const std::vector<float>& coeffs, float input);
 
-    // DC removal for x² path
-    float x2_dc_ = 0.0f;
-    float x2_dc_alpha_ = 0.0f;
+    // Pins
+    AudioInPin pinIn_;
+    AudioOutPin pinOut_;
+    FloatInPin pinDrive_;
+    FloatInPin pinMix_;
+    FloatInPin pinAlpha_;
+    FloatInPin pinBeta_;
+    FloatInPin pinHyst_;
+    FloatInPin pinHystFreq_; // external control for hysteresis cutoff frequency
 
-    // Hysteresis state
-    float hystState_ = 0.0f;
+    // FIR and buffers
+    std::vector<float> harmFirCoeffs_;
+    std::vector<float> hystFirCoeffs_;
+    std::vector<float> harmFirBuf_;
+    std::vector<float> hystFirBuf_;
 
-    // Morphing FIR state
-    bool morphing_ = false;
-    int morphCounter_ = 0;
-    int morphSamples_ = 512;
-    float hystCutoffHz_ = 4000.0f;
+    int harmFirPos_;
+    int hystFirPos_;
+    int harmFirTaps_;
+    int hystFirTaps_;
 
-    // Auto-sleep
-    int silenceCounter_ = 0;
-    const int silenceThreshold_ = 512; // samples
-    bool isSilent_ = false;
+    float sampleRate_;
 
-    // Internal constants
-    double sampleRate_ = 44100.0;
-    const float alphaScale_ = 0.25f;
-    const float betaScale_ = 0.15f;
+    // State variables
+    float x2_dc_;
+    float x2_dc_alpha_;
+    float hystState_;
+
+    // scaling factors
+    const float alphaScale_ = 1.0f;
+    const float betaScale_ = 1.0f;
 };
