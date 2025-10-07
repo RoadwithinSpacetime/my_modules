@@ -6,7 +6,7 @@
 #undef max
 
 RwSSaturation::RwSSaturation()
-    : harmFirPos1_(0), harmFirPos2_(0), hystFirPos_(0), dryDelayPos_(0)
+    : harmFirPos1_(0), harmFirPos2_(0), hystFirPos_(0)
 {
     initializePin(pinIn_);
     initializePin(pinOut_);
@@ -21,21 +21,25 @@ RwSSaturation::RwSSaturation()
 int32_t RwSSaturation::open()
 {
     sampleRate_ = getSampleRate();
-    if (sampleRate_ <= 0.0) sampleRate_ = 44100.0;
+    if (sampleRate_ <= 0.0)
+        sampleRate_ = 44100.0;
 
     harmFirTaps_ = 9;
     hystFirTaps_ = 31;
-    totalLatency_ = (harmFirTaps_ - 1) + (hystFirTaps_ - 1) / 2;
 
-    makeFIR(harmFirTaps_, sampleRate_, 4000.0, harmFirCoeffs_);
-    makeFIR(hystFirTaps_, sampleRate_, 15000.0, hystFirCoeffs_);
+    // harmonic filter (used before x³ generation)
+    makeFIR(harmFirTaps_, sampleRate_, 4000.0f, harmFirCoeffs_);
+
+    // hysteresis FIR default 20000 Hz
+    makeFIR(hystFirTaps_, sampleRate_, 20000.0f, hystFirCoeffs_);
 
     harmFirBuf1_.assign(harmFirTaps_, 0.0f);
     harmFirBuf2_.assign(harmFirTaps_, 0.0f);
     hystFirBuf_.assign(hystFirTaps_, 0.0f);
-    dryDelayBuf_.assign(totalLatency_ + 1, 0.0f);
 
-    harmFirPos1_ = harmFirPos2_ = hystFirPos_ = dryDelayPos_ = 0;
+    harmFirPos1_ = 0;
+    harmFirPos2_ = 0;
+    hystFirPos_ = 0;
 
     x2_dc_ = 0.0f;
     const double dcTau = 0.05;
@@ -51,9 +55,15 @@ int32_t RwSSaturation::open()
 
 void RwSSaturation::onSetPins()
 {
-    double hystCutoff = std::clamp(pinHystFreq_.getValue(), 1000.0f, 20000.0f);
+    // update hysteresis filter cutoff
+    float hystCutoff = std::clamp(
+        static_cast<float>(pinHystFreq_.getValue()),
+        1000.0f,
+        20000.0f
+    );
     makeFIR(hystFirTaps_, sampleRate_, hystCutoff, hystFirCoeffs_);
 
+    // CPU save mode
     if (!pinIn_.isStreaming())
     {
         setSubProcess(&RwSSaturation::subProcessSilent);
@@ -78,11 +88,11 @@ void RwSSaturation::subProcessSilent(int sampleFrames)
     }
 }
 
-void RwSSaturation::makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs)
+void RwSSaturation::makeFIR(int taps, double sampleRate, float cutoffHz, std::vector<float>& coeffs)
 {
     coeffs.resize(taps);
     const int M = taps - 1;
-    const double fc = cutoffHz / sampleRate;
+    const double fc = static_cast<double>(cutoffHz) / sampleRate;
 
     for (int n = 0; n < taps; ++n)
     {
@@ -94,7 +104,8 @@ void RwSSaturation::makeFIR(int taps, double sampleRate, double cutoffHz, std::v
 
     double sum = 0.0;
     for (auto v : coeffs) sum += v;
-    for (auto& v : coeffs) v = static_cast<float>(v / sum);
+    if (sum != 0.0)
+        for (auto& v : coeffs) v = static_cast<float>(v / sum);
 }
 
 float RwSSaturation::firProcess(std::vector<float>& buf, int& pos, const std::vector<float>& coeffs, float input)
@@ -107,7 +118,8 @@ float RwSSaturation::firProcess(std::vector<float>& buf, int& pos, const std::ve
     {
         acc += coeffs[i] * buf[idx];
         --idx;
-        if (idx < 0) idx += N;
+        if (idx < 0)
+            idx += N;
     }
     pos = (pos + 1) % N;
     return static_cast<float>(acc);
@@ -117,7 +129,8 @@ void RwSSaturation::subProcess(int sampleFrames)
 {
     const float* in = getBuffer(pinIn_);
     float* out = getBuffer(pinOut_);
-    if (!in || !out) return;
+    if (!in || !out)
+        return;
 
     const float drive = std::max(0.0f, pinDrive_.getValue());
     const float mix = std::clamp(pinMix_.getValue(), 0.0f, 1.0f);
@@ -133,16 +146,19 @@ void RwSSaturation::subProcess(int sampleFrames)
     {
         float x_in = in[s] * drive;
 
-        dryDelayBuf_[dryDelayPos_] = x_in;
-        float x_dry = dryDelayBuf_[(dryDelayPos_ + 1) % dryDelayBuf_.size()];
-        dryDelayPos_ = (dryDelayPos_ + 1) % dryDelayBuf_.size();
+        // Apply hysteresis smoothing first
+        hystState_ += hyst * (x_in - hystState_);
+        float hystOut = this->firProcess(hystFirBuf_, hystFirPos_, hystFirCoeffs_, hystState_);
 
-        float x_pre = firProcess(harmFirBuf1_, harmFirPos1_, harmFirCoeffs_, x_in);
-        x_pre = firProcess(harmFirBuf2_, harmFirPos2_, harmFirCoeffs_, x_pre);
+        // 3rd harmonic prefilter (shared for both harmonic stages)
+        float x_pre = this->firProcess(harmFirBuf1_, harmFirPos1_, harmFirCoeffs_, hystOut);
+        x_pre = this->firProcess(harmFirBuf2_, harmFirPos2_, harmFirCoeffs_, x_pre);
 
+        // harmonic generation
         float x2 = x_pre * x_pre;
         float x3 = x_pre * x_pre * x_pre;
 
+        // remove DC from x²
         x2_dc_ += x2_dc_alpha_ * (x2 - x2_dc_);
         float x2_hp = x2 - x2_dc_;
 
@@ -151,20 +167,18 @@ void RwSSaturation::subProcess(int sampleFrames)
 
         float shaped = x_in - harm2 - harm3;
 
-        // Drive-dependent cubic hysteresis (transformer-like)
-        float driveMod = 1.0f + 0.4f * (drive - 1.0f);
-        float hystMix = hyst * driveMod * (1.0f + 0.6f * shaped * shaped);
-
-        hystState_ += hystMix * (shaped - hystState_);
-        float wet = firProcess(hystFirBuf_, hystFirPos_, hystFirCoeffs_, hystState_);
-
-        float outSample = ((1.0f - mix) * x_dry) + (mix * wet);
+        // mix dry/wet
+        float outSample = ((1.0f - mix) * in[s]) + (mix * shaped);
         outSample *= trim;
 
-        if (!std::isfinite(outSample)) outSample = 0.0f;
-        out[s] = std::clamp(outSample, -20.0f, 20.0f);
+        if (!std::isfinite(outSample))
+            outSample = 0.0f;
+        outSample = std::clamp(outSample, -20.0f, 20.0f);
+
+        out[s] = outSample;
     }
 
+    // enter silent mode if input stops
     if (!pinIn_.isStreaming())
     {
         setSubProcess(&RwSSaturation::subProcessSilent);

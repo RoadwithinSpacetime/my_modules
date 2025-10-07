@@ -21,7 +21,8 @@ private:
     void subProcess(int sampleFrames);
     void subProcessSilent(int sampleFrames);
 
-    void makeFIR(int taps, double sampleRate, double cutoffHz, std::vector<float>& coeffs);
+    // FIR helper functions
+    void makeFIR(int taps, double sampleRate, float cutoffHz, std::vector<float>& coeffs);
     float firProcess(std::vector<float>& buf, int& pos, const std::vector<float>& coeffs, float input);
 
     // Pins
@@ -34,30 +35,28 @@ private:
     FloatInPin pinHyst_;
     FloatInPin pinHystFreq_;
 
-    // Buffers and states
+    // FIR buffers & coefficients
     std::vector<float> harmFirCoeffs_;
     std::vector<float> harmFirBuf1_;
     std::vector<float> harmFirBuf2_;
     std::vector<float> hystFirCoeffs_;
     std::vector<float> hystFirBuf_;
-    std::vector<float> dryDelayBuf_;
 
     int harmFirPos1_;
     int harmFirPos2_;
     int hystFirPos_;
-    int dryDelayPos_;
 
     int harmFirTaps_;
     int hystFirTaps_;
-    int totalLatency_;
 
     double sampleRate_ = 44100.0;
 
-    // States
+    // State
     float x2_dc_ = 0.0f;
     float x2_dc_alpha_ = 0.0f;
     float hystState_ = 0.0f;
 
-    const float alphaScale_ = 0.1f;
-    const float betaScale_ = 0.25f;
+    // Harmonic scales
+    const float alphaScale_ = 0.1f;  // scales 2nd harmonic
+    const float betaScale_ = 0.25f; // scales 3rd harmonic
 };

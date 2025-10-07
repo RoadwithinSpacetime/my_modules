@@ -3,8 +3,8 @@
 	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
 		<Description>
 			Transformer-style saturator with dual 9-tap harmonic prefilters,
-			level-dependent harmonics, cubic hysteresis filtering,
-			and external cutoff control.
+			hysteresis filtering before harmonic generation, and controllable cutoff.
+			Produces 2nd and 3rd harmonics only, with transformer-like dynamic response.
 		</Description>
 
 		<Audio>
