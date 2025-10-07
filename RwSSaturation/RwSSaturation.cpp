@@ -29,7 +29,7 @@ int32_t RwSSaturation::open()
     // two identical 9-tap filters in series
     makeFIR(harmFirTaps_, sampleRate_, 4000.0, harmFirCoeffs_);
 
-    // hysteresis FIR default 20 kHz
+    // hysteresis FIR default 20000 Hz
     makeFIR(hystFirTaps_, sampleRate_, 20000.0, hystFirCoeffs_);
 
     harmFirBuf1_.assign(harmFirTaps_, 0.0f);

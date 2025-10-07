@@ -1,16 +1,24 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Plugin id="RwSSaturation" name="RwS Saturation" category="RwS Modules">
-	<Audio>
-		<Pin name="In" direction="in" datatype="float" rate="audio"/>
-		<Pin name="Out" direction="out" datatype="float" rate="audio"/>
-	</Audio>
+<?xml version="1.0" encoding="UTF-8"?>
+<PluginList>
+	<Plugin id="RwSSaturation" name="RwSSaturation" category="RwS Modules">
+		<Description>
+			Transformer-style saturator with dual 9-tap harmonic prefilters,
+			level-dependent cubic and quadratic harmonics, hysteresis filtering,
+			and external cutoff control.
+		</Description>
 
-	<Parameters>
-		<Pin name="Drive" datatype="float" default="1.0" min="0.0" max="10.0" smoothing="false"/>
-		<Pin name="Mix" datatype="float" default="1.0" min="0.0" max="1.0" smoothing="false"/>
-		<Pin name="Alpha" datatype="float" default="0.5" min="0.0" max="1.0" smoothing="false"/>
-		<Pin name="Beta" datatype="float" default="0.25" min="0.0" max="1.0" smoothing="false"/>
-		<Pin name="Hyst" datatype="float" default="0.1" min="0.0" max="1.0" smoothing="false"/>
-		<Pin name="HystFreq" datatype="float" default="15000.0" min="1000.0" max="20000.0" units="Hz" smoothing="false"/>
-	</Parameters>
-</Plugin>
+		<Audio>
+			<Pin name="Input" datatype="float" direction="in" rate="audio"/>
+			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
+
+			<Pin name="Drive" datatype="float" direction="in" rate="control" default="1.0"/>
+			<Pin name="Mix" datatype="float" direction="in" rate="control" default="1.0"/>
+			<Pin name="Alpha" datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Beta" datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Hysteresis" datatype="float" direction="in" rate="control" default="0.1"/>
+			<Pin name="HysteresisFreq" datatype="float" direction="in" rate="control" default="15000.0"/>
+		</Audio>
+
+		<Vendor>Road_within_Spacetime</Vendor>
+	</Plugin>
+</PluginList>

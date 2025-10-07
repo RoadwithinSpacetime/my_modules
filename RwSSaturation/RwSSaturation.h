@@ -56,6 +56,6 @@ private:
     float x2_dc_alpha_ = 0.0f;
     float hystState_ = 0.0f;
 
-    const float alphaScale_ = 1.0f; // scales 2nd harmonic
-    const float betaScale_ = 1.0f; // scales 3rd harmonic
+    const float alphaScale_ = 0.1f; // scales 2nd harmonic
+    const float betaScale_ = 0.25f; // scales 3rd harmonic
 };
