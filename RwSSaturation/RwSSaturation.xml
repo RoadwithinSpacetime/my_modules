@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Plugin id="RwSSaturation" name="RwS Saturation" category="Distortion">
+<Plugin id="RwSSaturation" name="RwS Saturation" category="RwS Modules">
 	<Audio>
 		<Pin name="In" direction="in" datatype="float" rate="audio"/>
 		<Pin name="Out" direction="out" datatype="float" rate="audio"/>
