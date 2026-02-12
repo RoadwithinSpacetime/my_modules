@@ -1,0 +1,83 @@
+﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{411C7FFE-CC26-47D3-AE3C-89D9D5C68FFB}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>CyclePeakLookahead</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <!-- Debug and Release settings -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>C:\Program Files\SynthEdit 1.4\se_sdk3;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>C:\Program Files\SynthEdit 1.4\se_sdk3;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <!-- 👇 Add SynthEdit SDK3 include path -->
+      <AdditionalIncludeDirectories>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <!-- 👇 Add SynthEdit SDK3 include path -->
+      <AdditionalIncludeDirectories>C:\Program Files\SynthEdit 1.4\se_sdk3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <!-- Your source files -->
+    <ClCompile Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.cpp" />
+    <ClCompile Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.cpp" />
+    <ClCompile Include="RwSAllPass.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Your headers -->
+    <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.h" />
+    <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.h" />
+    <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_controller.h" />
+    <ClInclude Include="RwSAllPass.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="RwSAllPass.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="RwSAllPass.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="RwSAllPass.rc" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

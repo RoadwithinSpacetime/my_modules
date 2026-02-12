@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PluginList>
+	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
+		<Description>
+			High-quality stereo 16-stage all-pass phase rotation module.
+			Designed for analog-style depth, width, and spatial coherence.
+		</Description>
+
+		<Audio>
+			<!-- Audio pins -->
+			<Pin name="Input L"  datatype="float" direction="in"  rate="audio"/>
+			<Pin name="Input R"  datatype="float" direction="in"  rate="audio"/>
+			<Pin name="Output L" datatype="float" direction="out" rate="audio"/>
+			<Pin name="Output R" datatype="float" direction="out" rate="audio"/>
+
+			<!-- Control pins -->
+			<Pin name="Depth"  datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Drift"  datatype="float" direction="in" rate="control" default="0.0"/>
+			<Pin name="Bypass" datatype="bool"  direction="in" rate="control" default="0"/>
+		</Audio>
+
+		<Vendor>Road_within_Spacetime</Vendor>
+	</Plugin>
+</PluginList>
