@@ -1,5 +1,12 @@
 #include "RwSAllPass.h"
+#include "mp_sdk_factory.h"
+
+#include <algorithm>
+#include <cstring>
 #include <cmath>
+
+#undef min
+#undef max
 
 // =======================
 // Stage frequency layout
@@ -26,37 +33,63 @@ static const float baseDamping[STAGES] =
 // =======================
 // Constructor
 // =======================
-RwSAllPass::RwSAllPass(IMpUnknown* host)
-    : MpBase(host)
+RwSAllPass::RwSAllPass()
 {
-    initializePin(pinInL);
-    initializePin(pinInR);
-    initializePin(pinOutL);
-    initializePin(pinOutR);
+    initializePin(pinInL_);
+    initializePin(pinInR_);
+    initializePin(pinOutL_);
+    initializePin(pinOutR_);
 
-    initializePin(pinDepth);
-    initializePin(pinDrift);
-    initializePin(pinBypass);
+    initializePin(pinDepth_);
+    initializePin(pinDrift_);
+    initializePin(pinBypass_);
 }
 
 // =======================
-// Pin change callback
+// open()
+// =======================
+int32_t RwSAllPass::open()
+{
+    sampleRate_ = getSampleRate();
+    if (sampleRate_ <= 0.f)
+        sampleRate_ = 44100.f;
+
+    updateCoefficients();
+
+    setSubProcess(&RwSAllPass::subProcess);
+    pinOutL_.setStreaming(true);
+    pinOutR_.setStreaming(true);
+
+    return MpBase2::open();
+}
+
+// =======================
+// Pin changes
 // =======================
 void RwSAllPass::onSetPins()
 {
     updateCoefficients();
+
+    // CPU save mode
+    if (!pinInL_.isStreaming() || !pinInR_.isStreaming())
+    {
+        setSubProcess(&RwSAllPass::subProcessSilent);
+        pinOutL_.setStreaming(false);
+        pinOutR_.setStreaming(false);
+        return;
+    }
+
+    setSubProcess(&RwSAllPass::subProcess);
+    pinOutL_.setStreaming(true);
+    pinOutR_.setStreaming(true);
 }
 
 // =======================
-// Update all-pass coefficients
+// Update coefficients
 // =======================
 void RwSAllPass::updateCoefficients()
 {
-    float depth = pinDepth.getValue();
-    float sr = getSampleRate();
-
-    if (sr <= 0.f)
-        return;
+    float depth = std::clamp(pinDepth_.getValue(), 0.f, 1.f);
 
     for (int i = 0; i < STAGES; ++i)
     {
@@ -64,29 +97,52 @@ void RwSAllPass::updateCoefficients()
         float freqR = baseFreqs[i] * 1.006f;
 
         float damp = baseDamping[i] + depth * 0.5f;
+        damp = std::clamp(damp, 7.2f, 9.95f);
 
-        if (damp < 7.2f)  damp = 7.2f;
-        if (damp > 9.95f) damp = 9.95f;
+        float omegaL = 2.f * float(M_PI) * freqL / sampleRate_;
+        float omegaR = 2.f * float(M_PI) * freqR / sampleRate_;
 
-        float omegaL = 2.f * 3.14159265359f * freqL / sr;
-        float omegaR = 2.f * 3.14159265359f * freqR / sr;
+        apL_[i].a = (sinf(omegaL) - damp) / (sinf(omegaL) + damp);
+        apR_[i].a = (sinf(omegaR) - damp) / (sinf(omegaR) + damp);
 
-        apL[i].a = (sinf(omegaL) - damp) / (sinf(omegaL) + damp);
-        apR[i].a = (sinf(omegaR) - damp) / (sinf(omegaR) + damp);
+        apL_[i].reset();
+        apR_[i].reset();
+    }
+}
+
+// =======================
+// Silent processing
+// =======================
+void RwSAllPass::subProcessSilent(int sampleFrames)
+{
+    float* outL = getBuffer(pinOutL_);
+    float* outR = getBuffer(pinOutR_);
+
+    if (outL) std::memset(outL, 0, sampleFrames * sizeof(float));
+    if (outR) std::memset(outR, 0, sampleFrames * sizeof(float));
+
+    if (pinInL_.isStreaming() && pinInR_.isStreaming())
+    {
+        setSubProcess(&RwSAllPass::subProcess);
+        pinOutL_.setStreaming(true);
+        pinOutR_.setStreaming(true);
     }
 }
 
 // =======================
 // Audio processing
 // =======================
-void RwSAllPass::process(int sampleFrames)
+void RwSAllPass::subProcess(int sampleFrames)
 {
-    float* inL = pinInL.getBuffer();
-    float* inR = pinInR.getBuffer();
-    float* outL = pinOutL.getBuffer();
-    float* outR = pinOutR.getBuffer();
+    const float* inL = getBuffer(pinInL_);
+    const float* inR = getBuffer(pinInR_);
+    float* outL = getBuffer(pinOutL_);
+    float* outR = getBuffer(pinOutR_);
 
-    bool bypass = pinBypass.getValue() > 0.5f;
+    if (!inL || !inR || !outL || !outR)
+        return;
+
+    bool bypass = pinBypass_.getValue();
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -102,11 +158,26 @@ void RwSAllPass::process(int sampleFrames)
 
         for (int i = 0; i < STAGES; ++i)
         {
-            l = apL[i].process(l);
-            r = apR[i].process(r);
+            l = apL_[i].process(l);
+            r = apR_[i].process(r);
         }
 
         outL[s] = l;
         outR[s] = r;
     }
+
+    if (!pinInL_.isStreaming() || !pinInR_.isStreaming())
+    {
+        setSubProcess(&RwSAllPass::subProcessSilent);
+        pinOutL_.setStreaming(false);
+        pinOutR_.setStreaming(false);
+    }
 }
+
+// =======================
+// Classic SynthEdit registration
+// =======================
+namespace
+{
+    auto r = Register<RwSAllPass>::withId(L"RwSAllPass");
+    }

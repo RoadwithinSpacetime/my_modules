@@ -67,6 +67,7 @@
     <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_audio.h" />
     <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_common.h" />
     <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_controller.h" />
+    <ClInclude Include="C:\Program Files\SynthEdit 1.4\se_sdk3\mp_sdk_factory.h" />
     <ClInclude Include="RwSAllPass.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>

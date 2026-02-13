@@ -1,20 +1,25 @@
 #pragma once
 
 #include "mp_sdk_audio.h"
-#include "mp_sdk_controller.h"
+#include "mp_sdk_factory.h"
+#include <vector>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 #define STAGES 16
+
+using namespace gmpi;
 
 // =======================
 // One-pole all-pass stage
 // =======================
 struct AllPassStage
 {
-    float a;
-    float x1;
-    float y1;
-
-    AllPassStage() : a(0.f), x1(0.f), y1(0.f) {}
+    float a = 0.f;
+    float x1 = 0.f;
+    float y1 = 0.f;
 
     inline float process(float x)
     {
@@ -23,34 +28,43 @@ struct AllPassStage
         y1 = y;
         return y;
     }
+
+    inline void reset()
+    {
+        x1 = y1 = 0.f;
+    }
 };
 
 // =======================
 // Module class
 // =======================
-class RwSAllPass : public MpBase
+class RwSAllPass : public MpBase2
 {
 public:
-    RwSAllPass(IMpUnknown* host);
+    RwSAllPass();
 
-    void process(int sampleFrames);
+    int32_t open();
     void onSetPins();
 
-private:
-    // ---- Audio pins ----
-    AudioInPin  pinInL;
-    AudioInPin  pinInR;
-    AudioOutPin pinOutL;
-    AudioOutPin pinOutR;
+    void subProcess(int sampleFrames);
+    void subProcessSilent(int sampleFrames);
 
-    // ---- Control pins ----
-    FloatInPin pinDepth;
-    FloatInPin pinDrift;
-    BoolInPin  pinBypass;
+private:
+    // ---- Pins ----
+    AudioInPin  pinInL_;
+    AudioInPin  pinInR_;
+    AudioOutPin pinOutL_;
+    AudioOutPin pinOutR_;
+
+    FloatInPin pinDepth_;
+    FloatInPin pinDrift_;
+    BoolInPin  pinBypass_;
 
     // ---- DSP ----
-    AllPassStage apL[STAGES];
-    AllPassStage apR[STAGES];
+    AllPassStage apL_[STAGES];
+    AllPassStage apR_[STAGES];
+
+    float sampleRate_ = 44100.f;
 
     void updateCoefficients();
 };
