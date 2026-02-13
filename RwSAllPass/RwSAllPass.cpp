@@ -1,6 +1,4 @@
 #include "RwSAllPass.h"
-#include "mp_sdk_factory.h"
-
 #include <algorithm>
 #include <cstring>
 #include <cmath>
@@ -9,7 +7,7 @@
 #undef max
 
 // =======================
-// Stage frequency layout
+// Frequency layout (log-spaced, gentle)
 // =======================
 static const float baseFreqs[STAGES] =
 {
@@ -17,17 +15,6 @@ static const float baseFreqs[STAGES] =
     350.f,  520.f,  750.f, 1100.f,
    1600.f, 2300.f, 3300.f, 4700.f,
    6600.f, 9200.f, 12500.f, 16000.f
-};
-
-// =======================
-// Frequency-dependent damping
-// =======================
-static const float baseDamping[STAGES] =
-{
-    7.4f, 7.7f, 8.1f, 8.5f,
-    8.8f, 9.0f, 9.1f, 9.2f,
-    9.3f, 9.4f, 9.5f, 9.6f,
-    9.7f, 9.8f, 9.8f, 9.8f
 };
 
 // =======================
@@ -41,7 +28,6 @@ RwSAllPass::RwSAllPass()
     initializePin(pinOutR_);
 
     initializePin(pinDepth_);
-    initializePin(pinDrift_);
     initializePin(pinBypass_);
 }
 
@@ -51,8 +37,8 @@ RwSAllPass::RwSAllPass()
 int32_t RwSAllPass::open()
 {
     sampleRate_ = getSampleRate();
-    if (sampleRate_ <= 0.f)
-        sampleRate_ = 44100.f;
+    if (sampleRate_ <= 0.0f)
+        sampleRate_ = 44100.0f;
 
     updateCoefficients();
 
@@ -64,46 +50,35 @@ int32_t RwSAllPass::open()
 }
 
 // =======================
-// Pin changes
+// onSetPins()
+// IMPORTANT: NO streaming logic here
 // =======================
 void RwSAllPass::onSetPins()
 {
     updateCoefficients();
-
-    // CPU save mode
-    if (!pinInL_.isStreaming() || !pinInR_.isStreaming())
-    {
-        setSubProcess(&RwSAllPass::subProcessSilent);
-        pinOutL_.setStreaming(false);
-        pinOutR_.setStreaming(false);
-        return;
-    }
-
-    setSubProcess(&RwSAllPass::subProcess);
-    pinOutL_.setStreaming(true);
-    pinOutR_.setStreaming(true);
 }
 
 // =======================
-// Update coefficients
+// Coefficient update (STABLE all-pass)
 // =======================
 void RwSAllPass::updateCoefficients()
 {
-    float depth = std::clamp(pinDepth_.getValue(), 0.f, 1.f);
+    float depth = std::clamp(pinDepth_.getValue(), 0.0f, 1.0f);
 
     for (int i = 0; i < STAGES; ++i)
     {
-        float freqL = baseFreqs[i] * 0.994f;
-        float freqR = baseFreqs[i] * 1.006f;
+        float freq = baseFreqs[i];
 
-        float damp = baseDamping[i] + depth * 0.5f;
-        damp = std::clamp(damp, 7.2f, 9.95f);
+        float omega = 2.0f * float(M_PI) * freq / sampleRate_;
+        float g = tanf(omega * 0.5f);
 
-        float omegaL = 2.f * float(M_PI) * freqL / sampleRate_;
-        float omegaR = 2.f * float(M_PI) * freqR / sampleRate_;
+        // Gentle analog-style scaling
+        g *= (0.25f + 0.75f * depth);
 
-        apL_[i].a = (sinf(omegaL) - damp) / (sinf(omegaL) + damp);
-        apR_[i].a = (sinf(omegaR) - damp) / (sinf(omegaR) + damp);
+        float a = (1.0f - g) / (1.0f + g);
+
+        apL_[i].a = a;
+        apR_[i].a = a;
 
         apL_[i].reset();
         apR_[i].reset();
@@ -121,7 +96,8 @@ void RwSAllPass::subProcessSilent(int sampleFrames)
     if (outL) std::memset(outL, 0, sampleFrames * sizeof(float));
     if (outR) std::memset(outR, 0, sampleFrames * sizeof(float));
 
-    if (pinInL_.isStreaming() && pinInR_.isStreaming())
+    // Wake up when audio appears
+    if (pinInL_.isStreaming() || pinInR_.isStreaming())
     {
         setSubProcess(&RwSAllPass::subProcess);
         pinOutL_.setStreaming(true);
@@ -139,34 +115,39 @@ void RwSAllPass::subProcess(int sampleFrames)
     float* outL = getBuffer(pinOutL_);
     float* outR = getBuffer(pinOutR_);
 
-    if (!inL || !inR || !outL || !outR)
+    if (!outL || !outR)
         return;
+
+    // If no input, output silence
+    if (!inL && !inR)
+    {
+        std::memset(outL, 0, sampleFrames * sizeof(float));
+        std::memset(outR, 0, sampleFrames * sizeof(float));
+        return;
+    }
 
     bool bypass = pinBypass_.getValue();
 
     for (int s = 0; s < sampleFrames; ++s)
     {
-        if (bypass)
-        {
-            outL[s] = inL[s];
-            outR[s] = inR[s];
-            continue;
-        }
+        float l = inL ? inL[s] : 0.0f;
+        float r = inR ? inR[s] : l;
 
-        float l = inL[s];
-        float r = inR[s];
-
-        for (int i = 0; i < STAGES; ++i)
+        if (!bypass)
         {
-            l = apL_[i].process(l);
-            r = apR_[i].process(r);
+            for (int i = 0; i < STAGES; ++i)
+            {
+                l = apL_[i].process(l);
+                r = apR_[i].process(r);
+            }
         }
 
         outL[s] = l;
         outR[s] = r;
     }
 
-    if (!pinInL_.isStreaming() || !pinInR_.isStreaming())
+    // Enter silent mode ONLY after streaming stops
+    if (!pinInL_.isStreaming() && !pinInR_.isStreaming())
     {
         setSubProcess(&RwSAllPass::subProcessSilent);
         pinOutL_.setStreaming(false);
@@ -175,9 +156,9 @@ void RwSAllPass::subProcess(int sampleFrames)
 }
 
 // =======================
-// Classic SynthEdit registration
+// Registration (same as RwSSaturation)
 // =======================
 namespace
 {
     auto r = Register<RwSAllPass>::withId(L"RwSAllPass");
-    }
+}

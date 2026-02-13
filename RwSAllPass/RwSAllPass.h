@@ -1,25 +1,23 @@
 #pragma once
 
 #include "mp_sdk_audio.h"
-#include "mp_sdk_factory.h"
-#include <vector>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-#define STAGES 16
-
 using namespace gmpi;
+
+#define STAGES 16
 
 // =======================
 // One-pole all-pass stage
 // =======================
 struct AllPassStage
 {
-    float a = 0.f;
-    float x1 = 0.f;
-    float y1 = 0.f;
+    float a = 0.0f;
+    float x1 = 0.0f;
+    float y1 = 0.0f;
 
     inline float process(float x)
     {
@@ -31,7 +29,8 @@ struct AllPassStage
 
     inline void reset()
     {
-        x1 = y1 = 0.f;
+        x1 = 0.0f;
+        y1 = 0.0f;
     }
 };
 
@@ -57,14 +56,13 @@ private:
     AudioOutPin pinOutR_;
 
     FloatInPin pinDepth_;
-    FloatInPin pinDrift_;
     BoolInPin  pinBypass_;
 
     // ---- DSP ----
     AllPassStage apL_[STAGES];
     AllPassStage apR_[STAGES];
 
-    float sampleRate_ = 44100.f;
+    float sampleRate_ = 44100.0f;
 
     void updateCoefficients();
 };
