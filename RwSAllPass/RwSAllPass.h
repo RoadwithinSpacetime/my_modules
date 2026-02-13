@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mp_sdk_audio.h"
+#include <cmath>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -11,7 +12,7 @@ using namespace gmpi;
 #define STAGES 16
 
 // =======================
-// One-pole all-pass stage
+// One-pole all-pass
 // =======================
 struct AllPassStage
 {
@@ -29,13 +30,12 @@ struct AllPassStage
 
     inline void reset()
     {
-        x1 = 0.0f;
-        y1 = 0.0f;
+        x1 = y1 = 0.0f;
     }
 };
 
 // =======================
-// Module class
+// Module
 // =======================
 class RwSAllPass : public MpBase2
 {
@@ -49,18 +49,21 @@ public:
     void subProcessSilent(int sampleFrames);
 
 private:
-    // ---- Pins ----
+    // Pins
     AudioInPin  pinInL_;
     AudioInPin  pinInR_;
     AudioOutPin pinOutL_;
     AudioOutPin pinOutR_;
 
     FloatInPin pinDepth_;
+    FloatInPin pinDrift_;
     BoolInPin  pinBypass_;
 
-    // ---- DSP ----
+    // DSP
     AllPassStage apL_[STAGES];
     AllPassStage apR_[STAGES];
+
+    float driftPhase_[STAGES] = {};
 
     float sampleRate_ = 44100.0f;
 

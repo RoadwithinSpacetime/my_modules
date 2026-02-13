@@ -1,20 +1,19 @@
 #include "RwSAllPass.h"
 #include <algorithm>
 #include <cstring>
-#include <cmath>
 
 #undef min
 #undef max
 
 // =======================
-// Frequency layout (log-spaced, gentle)
+// Frequency layout (analog-like)
 // =======================
 static const float baseFreqs[STAGES] =
 {
-     60.f,   95.f,  150.f,  230.f,
-    350.f,  520.f,  750.f, 1100.f,
-   1600.f, 2300.f, 3300.f, 4700.f,
-   6600.f, 9200.f, 12500.f, 16000.f
+     60.f,   90.f,  140.f,  220.f,
+    340.f,  520.f,  780.f, 1150.f,
+   1700.f, 2500.f, 3600.f, 5200.f,
+   7400.f, 9800.f, 13000.f, 17000.f
 };
 
 // =======================
@@ -28,6 +27,7 @@ RwSAllPass::RwSAllPass()
     initializePin(pinOutR_);
 
     initializePin(pinDepth_);
+    initializePin(pinDrift_);
     initializePin(pinBypass_);
 }
 
@@ -51,29 +51,33 @@ int32_t RwSAllPass::open()
 
 // =======================
 // onSetPins()
-// IMPORTANT: NO streaming logic here
 // =======================
 void RwSAllPass::onSetPins()
 {
     updateCoefficients();
+
+    // Ensure DSP reacts immediately
+    setSubProcess(&RwSAllPass::subProcess);
+    pinOutL_.setStreaming(true);
+    pinOutR_.setStreaming(true);
 }
 
 // =======================
-// Coefficient update (STABLE all-pass)
+// Coefficients (stable + audible)
 // =======================
 void RwSAllPass::updateCoefficients()
 {
     float depth = std::clamp(pinDepth_.getValue(), 0.0f, 1.0f);
+    float depthShape = depth * depth;
 
     for (int i = 0; i < STAGES; ++i)
     {
         float freq = baseFreqs[i];
-
         float omega = 2.0f * float(M_PI) * freq / sampleRate_;
         float g = tanf(omega * 0.5f);
 
-        // Gentle analog-style scaling
-        g *= (0.25f + 0.75f * depth);
+        // Depth scaling (audible but safe)
+        g *= (0.15f + 3.0f * depthShape);
 
         float a = (1.0f - g) / (1.0f + g);
 
@@ -86,7 +90,7 @@ void RwSAllPass::updateCoefficients()
 }
 
 // =======================
-// Silent processing
+// Silent
 // =======================
 void RwSAllPass::subProcessSilent(int sampleFrames)
 {
@@ -96,7 +100,6 @@ void RwSAllPass::subProcessSilent(int sampleFrames)
     if (outL) std::memset(outL, 0, sampleFrames * sizeof(float));
     if (outR) std::memset(outR, 0, sampleFrames * sizeof(float));
 
-    // Wake up when audio appears
     if (pinInL_.isStreaming() || pinInR_.isStreaming())
     {
         setSubProcess(&RwSAllPass::subProcess);
@@ -106,7 +109,7 @@ void RwSAllPass::subProcessSilent(int sampleFrames)
 }
 
 // =======================
-// Audio processing
+// Audio
 // =======================
 void RwSAllPass::subProcess(int sampleFrames)
 {
@@ -118,15 +121,9 @@ void RwSAllPass::subProcess(int sampleFrames)
     if (!outL || !outR)
         return;
 
-    // If no input, output silence
-    if (!inL && !inR)
-    {
-        std::memset(outL, 0, sampleFrames * sizeof(float));
-        std::memset(outR, 0, sampleFrames * sizeof(float));
-        return;
-    }
-
     bool bypass = pinBypass_.getValue();
+    float drift = std::clamp(pinDrift_.getValue(), 0.0f, 1.0f);
+    float driftAmt = drift * 0.0025f;
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -137,8 +134,13 @@ void RwSAllPass::subProcess(int sampleFrames)
         {
             for (int i = 0; i < STAGES; ++i)
             {
-                l = apL_[i].process(l);
-                r = apR_[i].process(r);
+                float mod = 1.0f + driftAmt * sinf(driftPhase_[i]);
+                driftPhase_[i] += 0.00005f * (i + 1);
+                if (driftPhase_[i] > 2.f * float(M_PI))
+                    driftPhase_[i] -= 2.f * float(M_PI);
+
+                l = apL_[i].process(l * mod);
+                r = apR_[i].process(r / mod);
             }
         }
 
@@ -146,7 +148,6 @@ void RwSAllPass::subProcess(int sampleFrames)
         outR[s] = r;
     }
 
-    // Enter silent mode ONLY after streaming stops
     if (!pinInL_.isStreaming() && !pinInR_.isStreaming())
     {
         setSubProcess(&RwSAllPass::subProcessSilent);
@@ -156,7 +157,7 @@ void RwSAllPass::subProcess(int sampleFrames)
 }
 
 // =======================
-// Registration (same as RwSSaturation)
+// Registration
 // =======================
 namespace
 {

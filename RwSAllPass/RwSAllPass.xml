@@ -2,7 +2,8 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Stereo 16-stage all-pass phase rotation module for analog-style depth.
+			Stereo 16-stage analog-style all-pass phase rotation.
+			Adds depth, width and subtle motion without EQ or gain change.
 		</Description>
 
 		<Audio>
@@ -11,7 +12,7 @@
 			<Pin name="Output L" datatype="float" direction="out" rate="audio"/>
 			<Pin name="Output R" datatype="float" direction="out" rate="audio"/>
 
-			<Pin name="Depth"  datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Depth"  datatype="float" direction="in" rate="control" default="0.4"/>
 			<Pin name="Drift"  datatype="float" direction="in" rate="control" default="0.0"/>
 			<Pin name="Bypass" datatype="bool"  direction="in" rate="control" default="0"/>
 		</Audio>
