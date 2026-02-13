@@ -2,8 +2,8 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Stereo 16-stage analog-style all-pass phase rotation.
-			Adds depth, width and subtle motion without EQ or gain change.
+			Fairchild-670-style stereo phase rotation using 16 weighted all-pass stages.
+			Adds depth, space, and glue without EQ or level change.
 		</Description>
 
 		<Audio>

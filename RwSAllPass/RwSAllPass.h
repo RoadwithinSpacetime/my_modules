@@ -8,11 +8,12 @@
 #endif
 
 using namespace gmpi;
+#pragma once
 
 #define STAGES 16
 
 // =======================
-// One-pole all-pass
+// First-order all-pass
 // =======================
 struct AllPassStage
 {

@@ -6,14 +6,14 @@
 #undef max
 
 // =======================
-// Frequency layout (analog-like)
+// Fairchild-style frequency layout
 // =======================
 static const float baseFreqs[STAGES] =
 {
-     60.f,   90.f,  140.f,  220.f,
-    340.f,  520.f,  780.f, 1150.f,
-   1700.f, 2500.f, 3600.f, 5200.f,
-   7400.f, 9800.f, 13000.f, 17000.f
+     35.f,   55.f,   85.f,  130.f,
+    200.f,  320.f,  500.f,  750.f,
+   1100.f, 1600.f, 2300.f, 3300.f,
+   4700.f, 6500.f, 9000.f, 13000.f
 };
 
 // =======================
@@ -56,14 +56,14 @@ void RwSAllPass::onSetPins()
 {
     updateCoefficients();
 
-    // Ensure DSP reacts immediately
+    // Ensure immediate response
     setSubProcess(&RwSAllPass::subProcess);
     pinOutL_.setStreaming(true);
     pinOutR_.setStreaming(true);
 }
 
 // =======================
-// Coefficients (stable + audible)
+// Fairchild-shaped coefficients
 // =======================
 void RwSAllPass::updateCoefficients()
 {
@@ -76,8 +76,28 @@ void RwSAllPass::updateCoefficients()
         float omega = 2.0f * float(M_PI) * freq / sampleRate_;
         float g = tanf(omega * 0.5f);
 
-        // Depth scaling (audible but safe)
-        g *= (0.15f + 3.0f * depthShape);
+        // -----------------------
+        // Per-band weighting
+        // -----------------------
+        float stageWeight;
+        if (i < 4)        stageWeight = 1.00f; // subs
+        else if (i < 7)   stageWeight = 0.85f; // low mids
+        else if (i < 10)  stageWeight = 0.65f; // mids
+        else if (i < 13)  stageWeight = 0.40f; // upper mids
+        else              stageWeight = 0.25f; // highs
+
+        // -----------------------
+        // Depth scaling (gentle)
+        // -----------------------
+        g *= stageWeight;
+        g *= (0.18f + 1.4f * depthShape);
+
+        // -----------------------
+        // HF taper (iron behavior)
+        // -----------------------
+        float hfTaper = 1.0f - 0.6f *
+            std::clamp((freq - 6000.f) / 10000.f, 0.f, 1.f);
+        g *= hfTaper;
 
         float a = (1.0f - g) / (1.0f + g);
 
@@ -90,7 +110,7 @@ void RwSAllPass::updateCoefficients()
 }
 
 // =======================
-// Silent
+// Silent processing
 // =======================
 void RwSAllPass::subProcessSilent(int sampleFrames)
 {
@@ -109,7 +129,7 @@ void RwSAllPass::subProcessSilent(int sampleFrames)
 }
 
 // =======================
-// Audio
+// Audio processing
 // =======================
 void RwSAllPass::subProcess(int sampleFrames)
 {
@@ -123,7 +143,7 @@ void RwSAllPass::subProcess(int sampleFrames)
 
     bool bypass = pinBypass_.getValue();
     float drift = std::clamp(pinDrift_.getValue(), 0.0f, 1.0f);
-    float driftAmt = drift * 0.0025f;
+    float driftAmt = drift * 0.002f;
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -135,7 +155,7 @@ void RwSAllPass::subProcess(int sampleFrames)
             for (int i = 0; i < STAGES; ++i)
             {
                 float mod = 1.0f + driftAmt * sinf(driftPhase_[i]);
-                driftPhase_[i] += 0.00005f * (i + 1);
+                driftPhase_[i] += 0.00004f * (i + 1);
                 if (driftPhase_[i] > 2.f * float(M_PI))
                     driftPhase_[i] -= 2.f * float(M_PI);
 
