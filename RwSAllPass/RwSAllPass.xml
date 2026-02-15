@@ -3,7 +3,7 @@
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
 			Dynamic analog-style stereo phase conditioner.
-			Pure phase rotation, no DC blocking, no amplitude shaping.
+			Pure phase rotation with level-dependent motion.
 		</Description>
 
 		<Audio>
