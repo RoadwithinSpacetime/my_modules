@@ -36,27 +36,6 @@ struct AllPassStage
 };
 
 // =======================
-// One-pole DC blocker
-// =======================
-struct DCBlocker
-{
-    float z = 0.0f;
-    float R = 0.995f; // ~10 Hz @ 44.1k
-
-    inline float process(float x)
-    {
-        float y = x - z;
-        z = x - y * R;
-        return y;
-    }
-
-    inline void reset()
-    {
-        z = 0.0f;
-    }
-};
-
-// =======================
 // RwSAllPass (stereo)
 // =======================
 class RwSAllPass : public MpBase2
@@ -85,10 +64,6 @@ private:
     std::array<AllPassStage, STAGES> apL_;
     std::array<AllPassStage, STAGES> apR_;
     std::array<float, STAGES> aBase_;
-    std::array<float, STAGES> aDyn_;
-
-    DCBlocker dcL_;
-    DCBlocker dcR_;
 
     double sampleRate_ = 44100.0;
 

@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-// Phase anchor frequencies
+// Phase anchor frequencies (Fairchild-style spacing)
 static const float phaseFreqs[STAGES] =
 {
     90.0f, 300.0f, 1000.0f, 3200.0f
@@ -31,9 +31,6 @@ int32_t RwSAllPass::open()
         sampleRate_ = 44100.0;
 
     env_ = 0.0f;
-    dcL_.reset();
-    dcR_.reset();
-
     updateBaseCoefficients();
 
     setSubProcess(&RwSAllPass::subProcess);
@@ -44,7 +41,7 @@ int32_t RwSAllPass::open()
 }
 
 // =======================
-// Pin changes
+// Pin updates
 // =======================
 void RwSAllPass::onSetPins()
 {
@@ -64,7 +61,7 @@ void RwSAllPass::onSetPins()
 }
 
 // =======================
-// Coefficient setup + reset
+// Base coefficient setup
 // =======================
 void RwSAllPass::updateBaseCoefficients()
 {
@@ -79,21 +76,26 @@ void RwSAllPass::updateBaseCoefficients()
         float omega = 2.0f * float(M_PI) * phaseFreqs[i] / float(sampleRate_);
         float g = tanf(omega * 0.5f);
 
-        g *= (0.15f + 0.25f * depthCurve);
+        // Conservative analog-like scaling
+        g *= (0.12f + 0.28f * depthCurve);
 
-        aBase_[i] = (1.0f - g) / (1.0f + g);
+        float a = (1.0f - g) / (1.0f + g);
+
+        // Absolute stability guarantee
+        if (a > 0.999f) a = 0.999f;
+        if (a < -0.999f) a = -0.999f;
+
+        aBase_[i] = a;
 
         apL_[i].reset();
         apR_[i].reset();
     }
 
     env_ = 0.0f;
-    dcL_.reset();
-    dcR_.reset();
 }
 
 // =======================
-// Silent
+// Silent processing
 // =======================
 void RwSAllPass::subProcessSilent(int sampleFrames)
 {
@@ -106,8 +108,6 @@ void RwSAllPass::subProcessSilent(int sampleFrames)
     if (pinInL_.isStreaming() && pinInR_.isStreaming())
     {
         env_ = 0.0f;
-        dcL_.reset();
-        dcR_.reset();
         setSubProcess(&RwSAllPass::subProcess);
         pinOutL_.setStreaming(true);
         pinOutR_.setStreaming(true);
@@ -119,6 +119,7 @@ void RwSAllPass::subProcessSilent(int sampleFrames)
 // =======================
 void RwSAllPass::subProcess(int sampleFrames)
 {
+    // CRITICAL: never touch buffers unless streaming
     if (!pinInL_.isStreaming() || !pinInR_.isStreaming())
         return;
 
@@ -138,21 +139,22 @@ void RwSAllPass::subProcess(int sampleFrames)
         float l = inL[s];
         float r = inR[s];
 
-        // Envelope (mono energy)
+        // Envelope follower (energy, not RMS)
         float level = 0.5f * (fabsf(l) + fabsf(r));
         if (level > env_)
             env_ += attack * (level - env_);
         else
             env_ += release * (level - env_);
 
-        float motion = tanhf(env_ * 2.5f);
+        float motion = tanhf(env_ * 2.2f);
 
         for (int i = 0; i < STAGES; ++i)
         {
-            float freqWeight = 1.0f / (1.0f + phaseFreqs[i] / 800.0f);
+            float freqWeight = 1.0f / (1.0f + phaseFreqs[i] / 900.0f);
+
             float a = aBase_[i] * (1.0f + 0.04f * motion * freqWeight);
 
-            // HARD stability clamp
+            // Hard safety clamp (must stay)
             if (a > 0.999f) a = 0.999f;
             if (a < -0.999f) a = -0.999f;
 
@@ -163,9 +165,8 @@ void RwSAllPass::subProcess(int sampleFrames)
             r = apR_[i].process(r);
         }
 
-        // Proper DC blocking (no feedback loop)
-        outL[s] = dcL_.process(l);
-        outR[s] = dcR_.process(r);
+        outL[s] = l;
+        outR[s] = r;
     }
 }
 

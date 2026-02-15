@@ -2,7 +2,8 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Dynamic stereo phase conditioner with internal envelope and DC blocking.
+			Dynamic analog-style stereo phase conditioner.
+			Pure phase rotation, no DC blocking, no amplitude shaping.
 		</Description>
 
 		<Audio>
