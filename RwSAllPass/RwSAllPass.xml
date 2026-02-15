@@ -2,8 +2,7 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Dynamic stereo phase conditioner with internal envelope-driven motion.
-			Streaming-safe and control-safe for SynthEdit SDK3.
+			Dynamic stereo phase conditioner with internal envelope and DC blocking.
 		</Description>
 
 		<Audio>
