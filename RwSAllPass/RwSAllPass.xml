@@ -2,7 +2,8 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Dynamic analog-style phase conditioner with internal envelope-driven motion.
+			All-pass phase rotator.
+			Gentle analog-style phase shaping for depth preconditioning.
 		</Description>
 
 		<Audio>
@@ -11,7 +12,8 @@
 			<Pin name="Out L" datatype="float" direction="out" rate="audio"/>
 			<Pin name="Out R" datatype="float" direction="out" rate="audio"/>
 
-			<Pin name="Depth" datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Depth"  datatype="float" direction="in" rate="control" default="0.5"/>
+			<Pin name="Bypass" datatype="bool"  direction="in" rate="control" default="0"/>
 		</Audio>
 
 		<Vendor>Road_within_Spacetime</Vendor>

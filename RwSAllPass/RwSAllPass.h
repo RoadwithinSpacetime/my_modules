@@ -12,7 +12,7 @@ using namespace gmpi;
 static const int STAGES = 4;
 
 // =======================
-// First-order all-pass
+// Simple first-order all-pass
 // =======================
 struct AllPassStage
 {
@@ -36,7 +36,7 @@ struct AllPassStage
 };
 
 // =======================
-// RwSAllPass
+// RwSAllPass module
 // =======================
 class RwSAllPass : public MpBase2
 {
@@ -49,23 +49,21 @@ public:
 private:
     void subProcess(int sampleFrames);
     void subProcessSilent(int sampleFrames);
-    void updateBaseCoefficients();
+    void updateCoefficients();
 
-    // Pins (IDENTICAL STYLE to RwSSaturation)
+    // Pins — MATCH RwSSaturation STYLE
     AudioInPin  pinInL_;
     AudioInPin  pinInR_;
     AudioOutPin pinOutL_;
     AudioOutPin pinOutR_;
-    FloatInPin  pinDepth_;
+
+    FloatInPin pinDepth_;
+    BoolInPin  pinBypass_;
 
     // DSP
     std::array<AllPassStage, STAGES> apL_;
     std::array<AllPassStage, STAGES> apR_;
     std::array<float, STAGES> aBase_;
-    std::array<float, STAGES> aDyn_;
 
     double sampleRate_ = 44100.0;
-
-    // Envelope follower
-    float env_ = 0.0f;
 };

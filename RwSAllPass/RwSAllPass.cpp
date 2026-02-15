@@ -3,10 +3,10 @@
 
 #include <cstring>
 
-// Phase anchor frequencies
+// Phase centers (very gentle, analog-like)
 static const float phaseFreqs[STAGES] =
 {
-    90.0f, 300.0f, 1000.0f, 3200.0f
+    80.0f, 250.0f, 800.0f, 2500.0f
 };
 
 // =======================
@@ -19,6 +19,7 @@ RwSAllPass::RwSAllPass()
     initializePin(pinOutL_);
     initializePin(pinOutR_);
     initializePin(pinDepth_);
+    initializePin(pinBypass_);
 }
 
 // =======================
@@ -30,7 +31,7 @@ int32_t RwSAllPass::open()
     if (sampleRate_ <= 0.0)
         sampleRate_ = 44100.0;
 
-    updateBaseCoefficients();
+    updateCoefficients();
 
     for (int i = 0; i < STAGES; ++i)
     {
@@ -50,25 +51,20 @@ int32_t RwSAllPass::open()
 // =======================
 void RwSAllPass::onSetPins()
 {
-    updateBaseCoefficients();
+    updateCoefficients();
 
     if (!pinInL_.isStreaming())
     {
         setSubProcess(&RwSAllPass::subProcessSilent);
         pinOutL_.setStreaming(false);
         pinOutR_.setStreaming(false);
-        return;
     }
-
-    setSubProcess(&RwSAllPass::subProcess);
-    pinOutL_.setStreaming(true);
-    pinOutR_.setStreaming(true);
 }
 
 // =======================
-// Coefficient setup
+// Coefficient calculation
 // =======================
-void RwSAllPass::updateBaseCoefficients()
+void RwSAllPass::updateCoefficients()
 {
     float depth = pinDepth_.getValue();
     if (depth < 0.0f) depth = 0.0f;
@@ -81,10 +77,10 @@ void RwSAllPass::updateBaseCoefficients()
         float omega = 2.0f * float(M_PI) * phaseFreqs[i] / float(sampleRate_);
         float g = tanf(omega * 0.5f);
 
-        g *= (0.12f + 0.35f * depthCurve);
+        // very gentle rotation
+        g *= (0.15f + 0.4f * depthCurve);
 
         aBase_[i] = (1.0f - g) / (1.0f + g);
-        aDyn_[i] = aBase_[i];
     }
 }
 
@@ -114,14 +110,6 @@ void RwSAllPass::subProcessSilent(int sampleFrames)
 // =======================
 void RwSAllPass::subProcess(int sampleFrames)
 {
-    if (!pinInL_.isStreaming())
-    {
-        setSubProcess(&RwSAllPass::subProcessSilent);
-        pinOutL_.setStreaming(false);
-        pinOutR_.setStreaming(false);
-        return;
-    }
-
     const float* inL = getBuffer(pinInL_);
     const float* inR = getBuffer(pinInR_);
     float* outL = getBuffer(pinOutL_);
@@ -130,35 +118,23 @@ void RwSAllPass::subProcess(int sampleFrames)
     if (!inL || !outL || !outR)
         return;
 
-    // Envelope timing
-    const float attack = 1.0f / (sampleRate_ * 0.08f);
-    const float release = 1.0f / (sampleRate_ * 0.7f);
+    bool bypass = pinBypass_.getValue();
 
     for (int s = 0; s < sampleFrames; ++s)
     {
         float l = inL[s];
         float r = inR ? inR[s] : l;
 
-        // mono energy
-        float level = 0.5f * (fabsf(l) + fabsf(r));
-
-        if (level > env_)
-            env_ += attack * (level - env_);
-        else
-            env_ += release * (level - env_);
-
-        float motion = tanhf(env_ * 3.0f);
-
-        for (int i = 0; i < STAGES; ++i)
+        if (!bypass)
         {
-            float freqWeight = 1.0f / (1.0f + phaseFreqs[i] / 700.0f);
-            aDyn_[i] = aBase_[i] * (1.0f + 0.06f * motion * freqWeight);
+            for (int i = 0; i < STAGES; ++i)
+            {
+                apL_[i].a = aBase_[i];
+                apR_[i].a = aBase_[i];
 
-            apL_[i].a = aDyn_[i];
-            apR_[i].a = aDyn_[i];
-
-            l = apL_[i].process(l);
-            r = apR_[i].process(r);
+                l = apL_[i].process(l);
+                r = apR_[i].process(r);
+            }
         }
 
         outL[s] = l;
