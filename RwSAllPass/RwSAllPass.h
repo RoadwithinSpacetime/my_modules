@@ -12,7 +12,7 @@ using namespace gmpi;
 static const int STAGES = 4;
 
 // =======================
-// First-order all-pass
+// First-order all-pass mono
 // =======================
 struct AllPassStage
 {

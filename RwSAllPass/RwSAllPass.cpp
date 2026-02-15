@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-// Phase anchor frequencies
+// Phase anchor frequencies mono
 static const float phaseFreqs[STAGES] =
 {
     90.0f, 300.0f, 1000.0f, 3200.0f

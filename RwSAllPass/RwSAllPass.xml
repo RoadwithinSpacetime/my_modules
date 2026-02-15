@@ -2,7 +2,7 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Dynamic analog-style phase conditioner.
+			Dynamic analog-style phase conditioner mono.
 			Mono DSP module; SynthEdit handles stereo automatically.
 		</Description>
 
