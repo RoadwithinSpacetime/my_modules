@@ -12,7 +12,7 @@ using namespace gmpi;
 static const int STAGES = 4;
 
 // =======================
-// First-order all-pass stage
+// First-order all-pass
 // =======================
 struct AllPassStage
 {
@@ -30,12 +30,13 @@ struct AllPassStage
 
     inline void reset()
     {
-        x1 = y1 = 0.0f;
+        x1 = 0.0f;
+        y1 = 0.0f;
     }
 };
 
 // =======================
-// Dynamic phase conditioner
+// RwSAllPass
 // =======================
 class RwSAllPass : public MpBase2
 {
@@ -50,7 +51,7 @@ private:
     void subProcessSilent(int sampleFrames);
     void updateBaseCoefficients();
 
-    // Pins
+    // Pins (IDENTICAL STYLE to RwSSaturation)
     AudioInPin  pinInL_;
     AudioInPin  pinInR_;
     AudioOutPin pinOutL_;

@@ -2,8 +2,7 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Dynamic analog-style phase conditioner.
-			Internal level-dependent phase motion for depth preconditioning.
+			Dynamic analog-style phase conditioner with internal envelope-driven motion.
 		</Description>
 
 		<Audio>

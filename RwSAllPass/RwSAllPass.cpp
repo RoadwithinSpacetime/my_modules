@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-// Phase anchor frequencies (log spaced)
+// Phase anchor frequencies
 static const float phaseFreqs[STAGES] =
 {
     90.0f, 300.0f, 1000.0f, 3200.0f
@@ -46,15 +46,27 @@ int32_t RwSAllPass::open()
 }
 
 // =======================
-// Pin changes
+// Pin updates
 // =======================
 void RwSAllPass::onSetPins()
 {
     updateBaseCoefficients();
+
+    if (!pinInL_.isStreaming())
+    {
+        setSubProcess(&RwSAllPass::subProcessSilent);
+        pinOutL_.setStreaming(false);
+        pinOutR_.setStreaming(false);
+        return;
+    }
+
+    setSubProcess(&RwSAllPass::subProcess);
+    pinOutL_.setStreaming(true);
+    pinOutR_.setStreaming(true);
 }
 
 // =======================
-// Static phase coefficients
+// Coefficient setup
 // =======================
 void RwSAllPass::updateBaseCoefficients()
 {
@@ -77,15 +89,24 @@ void RwSAllPass::updateBaseCoefficients()
 }
 
 // =======================
-// Silent
+// Silent processing
 // =======================
 void RwSAllPass::subProcessSilent(int sampleFrames)
 {
     float* outL = getBuffer(pinOutL_);
     float* outR = getBuffer(pinOutR_);
 
-    if (outL) std::memset(outL, 0, sampleFrames * sizeof(float));
-    if (outR) std::memset(outR, 0, sampleFrames * sizeof(float));
+    if (outL)
+        std::memset(outL, 0, sampleFrames * sizeof(float));
+    if (outR)
+        std::memset(outR, 0, sampleFrames * sizeof(float));
+
+    if (pinInL_.isStreaming())
+    {
+        setSubProcess(&RwSAllPass::subProcess);
+        pinOutL_.setStreaming(true);
+        pinOutR_.setStreaming(true);
+    }
 }
 
 // =======================
@@ -93,6 +114,14 @@ void RwSAllPass::subProcessSilent(int sampleFrames)
 // =======================
 void RwSAllPass::subProcess(int sampleFrames)
 {
+    if (!pinInL_.isStreaming())
+    {
+        setSubProcess(&RwSAllPass::subProcessSilent);
+        pinOutL_.setStreaming(false);
+        pinOutR_.setStreaming(false);
+        return;
+    }
+
     const float* inL = getBuffer(pinInL_);
     const float* inR = getBuffer(pinInR_);
     float* outL = getBuffer(pinOutL_);
@@ -101,9 +130,9 @@ void RwSAllPass::subProcess(int sampleFrames)
     if (!inL || !outL || !outR)
         return;
 
-    // Envelope (~80ms attack / ~700ms release)
-    const float envAlpha = 1.0f / (sampleRate_ * 0.08f);
-    const float envRelease = 1.0f / (sampleRate_ * 0.7f);
+    // Envelope timing
+    const float attack = 1.0f / (sampleRate_ * 0.08f);
+    const float release = 1.0f / (sampleRate_ * 0.7f);
 
     for (int s = 0; s < sampleFrames; ++s)
     {
@@ -113,11 +142,10 @@ void RwSAllPass::subProcess(int sampleFrames)
         // mono energy
         float level = 0.5f * (fabsf(l) + fabsf(r));
 
-        // asymmetric envelope
         if (level > env_)
-            env_ += envAlpha * (level - env_);
+            env_ += attack * (level - env_);
         else
-            env_ += envRelease * (level - env_);
+            env_ += release * (level - env_);
 
         float motion = tanhf(env_ * 3.0f);
 
