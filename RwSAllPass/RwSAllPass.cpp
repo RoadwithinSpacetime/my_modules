@@ -169,8 +169,8 @@ void RwSAllPass::subProcess(int sampleFrames)
         }
 
         // Implicit dry anchor (DC safety)
-        l = 0.995f * l + 0.005f * inL[s];
-        r = 0.995f * r + 0.005f * inR[s];
+        l = inL[s];
+        r = inR[s];
 
         outL[s] = l * startupGain_;
         outR[s] = r * startupGain_;
