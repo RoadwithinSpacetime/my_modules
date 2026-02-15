@@ -2,18 +2,17 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Fairchild-670-style stereo phase rotation using 16 weighted all-pass stages.
-			Adds depth, space, and glue without EQ or level change.
+			All-pass phase rotator.
+			Gentle analog-style phase shaping for depth preconditioning.
 		</Description>
 
 		<Audio>
-			<Pin name="Input L"  datatype="float" direction="in"  rate="audio"/>
-			<Pin name="Input R"  datatype="float" direction="in"  rate="audio"/>
-			<Pin name="Output L" datatype="float" direction="out" rate="audio"/>
-			<Pin name="Output R" datatype="float" direction="out" rate="audio"/>
+			<Pin name="In L"  datatype="float" direction="in"  rate="audio"/>
+			<Pin name="In R"  datatype="float" direction="in"  rate="audio"/>
+			<Pin name="Out L" datatype="float" direction="out" rate="audio"/>
+			<Pin name="Out R" datatype="float" direction="out" rate="audio"/>
 
-			<Pin name="Depth"  datatype="float" direction="in" rate="control" default="0.4"/>
-			<Pin name="Drift"  datatype="float" direction="in" rate="control" default="0.0"/>
+			<Pin name="Depth"  datatype="float" direction="in" rate="control" default="0.5"/>
 			<Pin name="Bypass" datatype="bool"  direction="in" rate="control" default="0"/>
 		</Audio>
 
