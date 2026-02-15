@@ -2,15 +2,13 @@
 <PluginList>
 	<Plugin id="RwSAllPass" name="RwSAllPass" category="RwS Modules">
 		<Description>
-			Dynamic stereo phase conditioner with internal envelope-driven motion.
-			Includes stability handling to avoid DC latch and startup artifacts.
+			Dynamic analog-style phase conditioner.
+			Mono DSP module; SynthEdit handles stereo automatically.
 		</Description>
 
 		<Audio>
-			<Pin name="In L"  datatype="float" direction="in"  rate="audio"/>
-			<Pin name="In R"  datatype="float" direction="in"  rate="audio"/>
-			<Pin name="Out L" datatype="float" direction="out" rate="audio"/>
-			<Pin name="Out R" datatype="float" direction="out" rate="audio"/>
+			<Pin name="Input"  datatype="float" direction="in"  rate="audio"/>
+			<Pin name="Output" datatype="float" direction="out" rate="audio"/>
 
 			<Pin name="Depth" datatype="float" direction="in" rate="control" default="0.5"/>
 		</Audio>

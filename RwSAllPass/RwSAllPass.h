@@ -36,7 +36,7 @@ struct AllPassStage
 };
 
 // =======================
-// RwSAllPass (dynamic, stable)
+// RwSAllPass (mono DSP)
 // =======================
 class RwSAllPass : public MpBase2
 {
@@ -51,16 +51,13 @@ private:
     void subProcessSilent(int sampleFrames);
     void updateBaseCoefficients();
 
-    // Pins
-    AudioInPin  pinInL_;
-    AudioInPin  pinInR_;
-    AudioOutPin pinOutL_;
-    AudioOutPin pinOutR_;
+    // Pins (IDENTICAL pattern to RwSSaturation)
+    AudioInPin  pinIn_;
+    AudioOutPin pinOut_;
     FloatInPin  pinDepth_;
 
     // DSP
-    std::array<AllPassStage, STAGES> apL_;
-    std::array<AllPassStage, STAGES> apR_;
+    std::array<AllPassStage, STAGES> ap_;
     std::array<float, STAGES> aBase_;
     std::array<float, STAGES> aDyn_;
 
@@ -69,6 +66,6 @@ private:
     // Internal envelope
     float env_ = 0.0f;
 
-    // Startup stabilization
+    // Startup stability
     float startupGain_ = 0.0f;
 };

@@ -3,7 +3,7 @@
 
 #include <cstring>
 
-// Phase anchor frequencies (log spaced)
+// Phase anchor frequencies
 static const float phaseFreqs[STAGES] =
 {
     90.0f, 300.0f, 1000.0f, 3200.0f
@@ -14,10 +14,8 @@ static const float phaseFreqs[STAGES] =
 // =======================
 RwSAllPass::RwSAllPass()
 {
-    initializePin(pinInL_);
-    initializePin(pinInR_);
-    initializePin(pinOutL_);
-    initializePin(pinOutR_);
+    initializePin(pinIn_);
+    initializePin(pinOut_);
     initializePin(pinDepth_);
 }
 
@@ -35,35 +33,35 @@ int32_t RwSAllPass::open()
 
     updateBaseCoefficients();
 
+    for (int i = 0; i < STAGES; ++i)
+        ap_[i].reset();
+
     setSubProcess(&RwSAllPass::subProcess);
-    pinOutL_.setStreaming(true);
-    pinOutR_.setStreaming(true);
+    pinOut_.setStreaming(true);
 
     return MpBase2::open();
 }
 
 // =======================
-// Pin updates
+// Pin changes
 // =======================
 void RwSAllPass::onSetPins()
 {
     updateBaseCoefficients();
 
-    if (!pinInL_.isStreaming())
+    if (!pinIn_.isStreaming())
     {
         setSubProcess(&RwSAllPass::subProcessSilent);
-        pinOutL_.setStreaming(false);
-        pinOutR_.setStreaming(false);
+        pinOut_.setStreaming(false);
         return;
     }
 
     setSubProcess(&RwSAllPass::subProcess);
-    pinOutL_.setStreaming(true);
-    pinOutR_.setStreaming(true);
+    pinOut_.setStreaming(true);
 }
 
 // =======================
-// Coefficient setup + STATE RESET
+// Coefficient setup + RESET
 // =======================
 void RwSAllPass::updateBaseCoefficients()
 {
@@ -82,55 +80,49 @@ void RwSAllPass::updateBaseCoefficients()
 
         aBase_[i] = (1.0f - g) / (1.0f + g);
 
-        // RESET FILTER STATE (critical)
-        apL_[i].reset();
-        apR_[i].reset();
+        // Reset filter state (critical)
+        ap_[i].reset();
     }
 
-    // RESET ENVELOPE (critical)
+    // Reset envelope (critical)
     env_ = 0.0f;
 }
 
 // =======================
-// Silent
+// Silent processing
 // =======================
 void RwSAllPass::subProcessSilent(int sampleFrames)
 {
-    float* outL = getBuffer(pinOutL_);
-    float* outR = getBuffer(pinOutR_);
+    float* out = getBuffer(pinOut_);
 
-    if (outL) std::memset(outL, 0, sampleFrames * sizeof(float));
-    if (outR) std::memset(outR, 0, sampleFrames * sizeof(float));
+    if (out)
+        std::memset(out, 0, sampleFrames * sizeof(float));
 
-    if (pinInL_.isStreaming())
+    if (pinIn_.isStreaming())
     {
         startupGain_ = 0.0f;
         env_ = 0.0f;
         setSubProcess(&RwSAllPass::subProcess);
-        pinOutL_.setStreaming(true);
-        pinOutR_.setStreaming(true);
+        pinOut_.setStreaming(true);
     }
 }
 
 // =======================
-// Audio processing (stable)
+// Audio processing
 // =======================
 void RwSAllPass::subProcess(int sampleFrames)
 {
-    if (!pinInL_.isStreaming())
+    if (!pinIn_.isStreaming())
     {
         setSubProcess(&RwSAllPass::subProcessSilent);
-        pinOutL_.setStreaming(false);
-        pinOutR_.setStreaming(false);
+        pinOut_.setStreaming(false);
         return;
     }
 
-    const float* inL = getBuffer(pinInL_);
-    const float* inR = getBuffer(pinInR_);
-    float* outL = getBuffer(pinOutL_);
-    float* outR = getBuffer(pinOutR_);
+    const float* in = getBuffer(pinIn_);
+    float* out = getBuffer(pinOut_);
 
-    if (!inL || !outL || !outR)
+    if (!in || !out)
         return;
 
     const float attack = 1.0f / (sampleRate_ * 0.08f);
@@ -139,7 +131,7 @@ void RwSAllPass::subProcess(int sampleFrames)
 
     for (int s = 0; s < sampleFrames; ++s)
     {
-        // Startup fade-in (anti-DC latch)
+        // Startup fade-in
         if (startupGain_ < 1.0f)
         {
             startupGain_ += fadeIn;
@@ -147,12 +139,10 @@ void RwSAllPass::subProcess(int sampleFrames)
                 startupGain_ = 1.0f;
         }
 
-        float l = inL[s];
-        float r = inR ? inR[s] : l;
+        float x = in[s];
 
-        // Envelope (mono energy)
-        float level = 0.5f * (fabsf(l) + fabsf(r));
-
+        // Envelope follower
+        float level = fabsf(x);
         if (level > env_)
             env_ += attack * (level - env_);
         else
@@ -165,19 +155,14 @@ void RwSAllPass::subProcess(int sampleFrames)
             float freqWeight = 1.0f / (1.0f + phaseFreqs[i] / 700.0f);
             aDyn_[i] = aBase_[i] * (1.0f + 0.06f * motion * freqWeight);
 
-            apL_[i].a = aDyn_[i];
-            apR_[i].a = aDyn_[i];
-
-            l = apL_[i].process(l);
-            r = apR_[i].process(r);
+            ap_[i].a = aDyn_[i];
+            x = ap_[i].process(x);
         }
 
-        // Implicit dry anchor (breaks DC locks)
-        l = 0.995f * l + 0.005f * inL[s];
-        r = 0.995f * r + 0.005f * inR[s];
+        // Implicit dry anchor (DC safety)
+        x = 0.995f * x + 0.005f * in[s];
 
-        outL[s] = l * startupGain_;
-        outR[s] = r * startupGain_;
+        out[s] = x * startupGain_;
     }
 }
 
